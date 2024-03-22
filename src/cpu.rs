@@ -1,6 +1,7 @@
 use std::u8;
 
 use int_enum::IntEnum;
+use crate::opcodes::OPCODE_LDA;
 
 pub struct CPU {
     pub register_a: u8,
@@ -82,12 +83,21 @@ impl  CPU {
                 return;
             }
 
+            // let a = OPCODE_LDA.IMMEDIATE_0xA9;
+            match byte_code {
+                val if OPCODE_LDA.IMMEDIATE_0xA9 == byte_code => {
+                    
+                }
+
+                _ => todo!(),
+            }
+
             self.execute(opscode.unwrap())
         }
     }
 
     fn execute(&mut self, opscode: Opscode) {
-
+            
         match opscode {
             Opscode::BRK_0x00 => {
                 // https://www.nesdev.org/obelisk-6502-guide/reference.html#BRK
