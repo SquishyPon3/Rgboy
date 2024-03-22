@@ -1,6 +1,7 @@
 use std::u8;
 
 use int_enum::IntEnum;
+use crate::opcodes;
 use crate::opcodes::OPCODE_LDA;
 
 pub struct CPU {
@@ -85,7 +86,10 @@ impl  CPU {
 
             // let a = OPCODE_LDA.IMMEDIATE_0xA9;
             match byte_code {
-                val if OPCODE_LDA.IMMEDIATE_0xA9 == byte_code => {
+                opcodes::LDA::IMMEDIATE_0xA9 => {
+                    
+                }
+                opcodes::LDA::ZERO_PAGE_0xA5 => {
                     
                 }
 
