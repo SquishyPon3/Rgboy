@@ -1,3 +1,79 @@
+/// Generates an opcode and its various specific params
+#[macro_export]
+macro_rules! opcode {
+    ($($name:ident [$(($value:tt, $length:tt, $cycles:tt, $mode:ident)),*,]),*) => (
+        use crate::cpu::{CPU, Flag};
+
+        $(pub mod $name {
+            // pub const modes: [crate::opcodes::AddressingMode; 10] = [
+            //     $(crate::opcodes::AddressingMode::$mode,)*
+            // ];
+            $(
+                pub mod $mode {
+                    pub const VALUE: u8 = $value;
+                    pub const LEN: u8 = $length;
+                    pub const CYCLES: u8 = $cycles;
+                    
+                    // Dynamically build this with a provided expr argument?
+                    // pub fn execute(
+                    //     cpu: &mut crate::cpu::CPU, 
+                    //     mode: crate::opcodes::AddressingMode) 
+                    // {
+                    //     cpu.counter += (LEN - 1) as u16;
+                    // }
+                }
+            )*
+        })*
+
+        // pub fn execute(cpu: &CPU, byte_code: u8) {
+        //     match {
+        //         $($(
+        //             $name::$mode::VALUE => {
+        //                 $name::$mode::execute(cpu, AddressingMode::$mode)
+        //                 cpu.counter += ($name::$mode::LEN - 1) as u16;
+        //             }
+        //         )*)*
+        //     }
+        // }
+    )
+}
+
+// Need to find a way to make opcode! macro able to take in
+// multiple opcodes in order to also generate a pub execute function
+// which can match to which opcode / params and run their specific
+// execute function!
+// #[macro_export]
+// macro_rules! execute {
+//     ($byte_code:tt) => {
+//       match byte_code {
+
+//       }
+//     };
+// }
+
+opcode![
+    ADC [
+        (0x69, 2, 2, IMMEDIATE),
+        (0x65, 2, 3, ZERO_PAGE),
+        (0x75, 2, 4, ZERO_PAGE_X),
+        (0x6D, 3, 4, ABSOLUTE),
+        (0x7D, 3, 4, ABSOLUTE_X),
+        (0x79, 3, 4, ABSOLUTE_Y),
+        (0x61, 2, 6, INDIRECT_X),
+        (0x71, 2, 5, INDIRECT_Y),
+    ],
+    AND [
+        (0x29, 2, 2, IMMEDIATE), 
+        (0x25, 2, 3, ZERO_PAGE),
+        (0x35, 2, 4, ZERO_PAGE_X),
+        (0x2D, 3, 4, ABSOLUTE),
+        (0x3D, 3, 4, ABSOLUTE_X),
+        (0x39, 3, 4, ABSOLUTE_Y),
+        (0x21, 2, 6, INDIRECT_X),
+        (0x31, 2, 5, INDIRECT_Y),
+    ]
+];
+
 pub mod BRK_0x00 {
     pub const VALUE: u8 = 0x00;
     pub const LEN: u8 = 1;
@@ -122,28 +198,28 @@ pub mod LDA {
     pub const fn get_mode(opcode: u8) -> (AddressingMode, u8) {
         match opcode {
             IMMEDIATE_0xA9::VALUE => {
-                (AddressingMode::Immediate, IMMEDIATE_0xA9::LEN)
+                (AddressingMode::IMMEDIATE, IMMEDIATE_0xA9::LEN)
             }
             ZERO_PAGE_0xA5::VALUE => {
-                (AddressingMode::ZeroPage, ZERO_PAGE_0xA5::LEN)
+                (AddressingMode::ZERO_PAGE, ZERO_PAGE_0xA5::LEN)
             }
             ZERO_PAGE_X_0xB5::VALUE => {
-                (AddressingMode::ZeroPage_X, ZERO_PAGE_X_0xB5::LEN)
+                (AddressingMode::ZERO_PAGE_X, ZERO_PAGE_X_0xB5::LEN)
             }
             ABSOLUTE_0xAD::VALUE => {
-                (AddressingMode::Absolute, ABSOLUTE_0xAD::LEN)
+                (AddressingMode::ABSOLUTE, ABSOLUTE_0xAD::LEN)
             }
             ABSOLUTE_X_0xBD::VALUE => {
-                (AddressingMode::Absolute_X, ABSOLUTE_X_0xBD::LEN)
+                (AddressingMode::ABSOLUTE_X, ABSOLUTE_X_0xBD::LEN)
             }
             ABSOLUTE_Y_0xB9::VALUE => {
-                (AddressingMode::Absolute_Y, ABSOLUTE_Y_0xB9::LEN)
+                (AddressingMode::ABSOLUTE_Y, ABSOLUTE_Y_0xB9::LEN)
             }
             INDIRECT_X_0xA1::VALUE => {
-                (AddressingMode::Indirect_X, INDIRECT_X_0xA1::LEN)
+                (AddressingMode::INDIRECT_X, INDIRECT_X_0xA1::LEN)
             }
             INDIRECT_Y_0xB1::VALUE => {
-                (AddressingMode::Indirect_Y, INDIRECT_Y_0xB1::LEN)
+                (AddressingMode::INDIRECT_Y, INDIRECT_Y_0xB1::LEN)
             }
             _ => todo!()
         }
@@ -215,7 +291,7 @@ pub mod INX_0xE8 {
 
 pub mod JSR_0x20 {
     use crate::cpu::{CPU, Flag};
-    use super::AddressingMode::Absolute;
+    use super::AddressingMode::ABSOLUTE;
     
     pub const VALUE: u8 = 0x20;
     pub const LEN: u8 = 3;
@@ -225,7 +301,7 @@ pub mod JSR_0x20 {
 
     pub fn execute(cpu: &mut CPU) {
         todo!();
-        let addr = cpu.get_operand_addr(Absolute);
+        let addr = cpu.get_operand_addr(ABSOLUTE);
         let val = cpu.mem_read(addr);
 
         cpu.counter = addr;
@@ -248,16 +324,16 @@ pub mod RTS_0x60 {
 }
 
 #[derive(Debug)]
-#[allow(non_camel_case_types)]
+#[allow(non_camel_case_types, unused)]
 pub enum AddressingMode {
-    Immediate,
-    ZeroPage,
-    ZeroPage_X,
-    ZeroPage_Y,
-    Absolute,
-    Absolute_X,
-    Absolute_Y,
-    Indirect_X,
-    Indirect_Y,
-    NoneAddressing,
+    IMMEDIATE,
+    ZERO_PAGE,
+    ZERO_PAGE_X,
+    ZERO_PAGE_Y,
+    ABSOLUTE,
+    ABSOLUTE_X,
+    ABSOLUTE_Y,
+    INDIRECT_X,
+    INDIRECT_Y,
+    NONE_ADDRESSING,
 }

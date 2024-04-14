@@ -21,6 +21,21 @@ const PGRM_ROM_END: u16 = 0xFFFF;
 // Address stored within cartridge which indicates where execution begins
 const PGRM_START_ADDR: u16 = 0xFFFC;
 
+// #[macro_export]
+// macro_rules! execute {
+//     ($cpu:tt, $byte_code:tt, {$($opcode:ident::$param:ident),*,}) => {
+//         match $byte_code {
+//             $(
+//                 $opcode::$param::VALUE => {
+//                     $opcode::$param::execute(&$cpu, AddressingMode::$param);
+//                     $cpu.counter += ($opcode::$param::LEN - 1) as u16;
+//                 }
+//             )*
+//             _ => todo!()
+//         }
+//     }
+// }
+
 impl CPU {
 
     pub fn new() -> Self {
@@ -80,41 +95,41 @@ impl CPU {
     pub fn get_operand_addr(&self, mode: AddressingMode) -> u16 {
         use AddressingMode::*;
         match mode {
-            Immediate => self.counter,
+            IMMEDIATE => self.counter,
 
-            ZeroPage => self.mem_read(self.counter) as u16,
+            ZERO_PAGE => self.mem_read(self.counter) as u16,
 
-            Absolute => self.mem_read_u16(self.counter),
+            ABSOLUTE => self.mem_read_u16(self.counter),
 
-            ZeroPage_X => {
+            ZERO_PAGE_X => {
                 let pos = self.mem_read(self.counter);
                 let addr = pos.wrapping_add(self.register_x) as u16;
                 
                 return addr;
             },
 
-            ZeroPage_Y => {
+            ZERO_PAGE_Y => {
                 let pos = self.mem_read(self.counter);
                 let addr = pos.wrapping_add(self.register_y) as u16;
 
                 return addr;
             },
 
-            Absolute_X => {
+            ABSOLUTE_X => {
                 let base = self.mem_read_u16(self.counter);
                 let addr = base.wrapping_add(self.register_x as u16);
 
                 return addr;
             }
 
-            Absolute_Y => {
+            ABSOLUTE_Y => {
                 let base = self.mem_read_u16(self.counter);
                 let addr = base.wrapping_add(self.register_y as u16);
 
                 return addr;
             }
 
-            Indirect_X => {
+            INDIRECT_X => {
                 let base = self.mem_read(self.counter);
 
                 let ptr: u8 = (base as u8).wrapping_add(self.register_x);
@@ -124,7 +139,7 @@ impl CPU {
                 return (hi as u16) << 8 | (lo as u16);
             }
 
-            Indirect_Y => {
+            INDIRECT_Y => {
                 let base = self.mem_read(self.counter);
 
                 let lo = self.mem_read(base as u16);
@@ -135,7 +150,7 @@ impl CPU {
                 return deref;
             }
             
-            NoneAddressing => {
+            NONE_ADDRESSING => {
                 panic!("mode {:?} is not supported", mode);
             }
         }
@@ -152,63 +167,61 @@ impl CPU {
             //     return;
             // }
 
-            match byte_code {
+            // execute!(self, byte_code, 
+            //     {
+            //         ADC::IMMEDIATE, 
+            //         ADC::ZERO_PAGE, 
+            //         ADC::ZERO_PAGE_X, 
+            //         ADC::ABSOLUTE, 
+            //         ADC::ABSOLUTE_X, 
+            //         ADC::ABSOLUTE_Y,
+            //     }
+            // );
+
+            match byte_code {                
+
                 BRK_0x00::VALUE => {
                     self.counter += (BRK_0x00::LEN - 1) as u16;
                     return;
                 }
 
                 CPY::ABSOLUTE_0xCC::VALUE => {
-                    CPY::execute(self, AddressingMode::Absolute);
+                    CPY::execute(self, AddressingMode::ABSOLUTE);
                     self.counter += (CPY::ABSOLUTE_0xCC::LEN - 1) as u16;
                 }
                 
-                // Experimental combined execute
-                // which requires another whole match statement
-                // in order to avoid errors.
-                // I intend to look into macros to solve this problem
-                // instead.
-                LDA::IMMEDIATE_0xA9::VALUE 
-                | LDA::ZERO_PAGE_0xA5::VALUE
-                | LDA::ZERO_PAGE_X_0xB5::VALUE
-                | LDA::ABSOLUTE_0xAD::VALUE
-                | LDA::ABSOLUTE_X_0xBD::VALUE
-                | LDA::ABSOLUTE_Y_0xB9::VALUE
-                | LDA::INDIRECT_X_0xA1::VALUE
-                | LDA::INDIRECT_Y_0xB1::VALUE => {                    
-                    self.counter += (LDA::execute_combined(self, byte_code) - 1) as u16;
-                }
+                
 
                 LDA::IMMEDIATE_0xA9::VALUE => {
-                    LDA::execute(self, AddressingMode::Immediate);
+                    LDA::execute(self, AddressingMode::IMMEDIATE);
                     self.counter += (LDA::IMMEDIATE_0xA9::LEN - 1) as u16;                    
                 }
                 LDA::ZERO_PAGE_0xA5::VALUE => {
-                    LDA::execute(self, AddressingMode::ZeroPage);
+                    LDA::execute(self, AddressingMode::ZERO_PAGE);
                     self.counter += (LDA::ZERO_PAGE_0xA5::LEN - 1) as u16;
                 }
                 LDA::ZERO_PAGE_X_0xB5::VALUE => {
-                    LDA::execute(self, AddressingMode::ZeroPage_X);
+                    LDA::execute(self, AddressingMode::ZERO_PAGE_X);
                     self.counter += (LDA::ZERO_PAGE_X_0xB5::LEN - 1) as u16;
                 }
                 LDA::ABSOLUTE_0xAD::VALUE => {
-                    LDA::execute(self, AddressingMode::Absolute);
+                    LDA::execute(self, AddressingMode::ABSOLUTE);
                     self.counter += (LDA::ABSOLUTE_0xAD::LEN - 1) as u16;
                 }
                 LDA::ABSOLUTE_X_0xBD::VALUE => {
-                    LDA::execute(self, AddressingMode::Absolute_X);
+                    LDA::execute(self, AddressingMode::ABSOLUTE_X);
                     self.counter += (LDA::ABSOLUTE_X_0xBD::LEN - 1) as u16;
                 }
                 LDA::ABSOLUTE_Y_0xB9::VALUE => {
-                    LDA::execute(self, AddressingMode::Absolute_Y);
+                    LDA::execute(self, AddressingMode::ABSOLUTE_Y);
                     self.counter += (LDA::ABSOLUTE_Y_0xB9::LEN - 1) as u16;
                 }
                 LDA::INDIRECT_X_0xA1::VALUE => {
-                    LDA::execute(self, AddressingMode::Indirect_X);
+                    LDA::execute(self, AddressingMode::INDIRECT_X);
                     self.counter += (LDA::INDIRECT_X_0xA1::LEN - 1) as u16;
                 }
                 LDA::INDIRECT_Y_0xB1::VALUE => {
-                    LDA::execute(self, AddressingMode::Indirect_Y);
+                    LDA::execute(self, AddressingMode::INDIRECT_Y);
                     self.counter += (LDA::INDIRECT_Y_0xB1::LEN - 1) as u16;
                 }
 
