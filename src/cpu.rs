@@ -1,12 +1,14 @@
 use std::u8;
 
 use int_enum::IntEnum;
-use crate::opcodes;
-use crate::opcodes::OPCODE_LDA;
+use crate::opcodes::{self, *};
+
+use self::LDA::INDIRECT_X_0xA1;
 
 pub struct CPU {
     pub register_a: u8,
     pub register_x: u8,
+    pub register_y: u8,
     pub status: u8,
     pub counter: u16,
     // [0x80000 .. 0xFFFF] Program ROM
@@ -19,19 +21,20 @@ const PGRM_ROM_END: u16 = 0xFFFF;
 // Address stored within cartridge which indicates where execution begins
 const PGRM_START_ADDR: u16 = 0xFFFC;
 
-impl  CPU {
+impl CPU {
 
     pub fn new() -> Self {
         CPU {
             register_a: 0,
             register_x: 0,
+            register_y: 0,
             status: 0,
             counter: 0,
             memory: [0; PGRM_ROM_END as usize]
         }
     }
 
-    fn mem_read(&self, addr: u16) -> u8 {
+    pub fn mem_read(&self, addr: u16) -> u8 {
         self.memory[addr as usize]
     }
 
@@ -52,10 +55,11 @@ impl  CPU {
     }
 
     // Resets the state (register and flags) and sets counter to cart start addr
-    fn reset_interrupt(&mut self) {
+    pub fn reset_interrupt(&mut self) {
         // reset method should restore the state of all registers, and initialize program_counter by the 2-byte value stored at 0xFFFC
         self.register_a = 0;
         self.register_x = 0;
+        self.register_y = 0;
         self.status = 0;
         self.counter = self.mem_read_u16(PGRM_START_ADDR)
     }
@@ -73,30 +77,155 @@ impl  CPU {
         self.run();
     }
 
+    pub fn get_operand_addr(&self, mode: AddressingMode) -> u16 {
+        use AddressingMode::*;
+        match mode {
+            Immediate => self.counter,
+
+            ZeroPage => self.mem_read(self.counter) as u16,
+
+            Absolute => self.mem_read_u16(self.counter),
+
+            ZeroPage_X => {
+                let pos = self.mem_read(self.counter);
+                let addr = pos.wrapping_add(self.register_x) as u16;
+                
+                return addr;
+            },
+
+            ZeroPage_Y => {
+                let pos = self.mem_read(self.counter);
+                let addr = pos.wrapping_add(self.register_y) as u16;
+
+                return addr;
+            },
+
+            Absolute_X => {
+                let base = self.mem_read_u16(self.counter);
+                let addr = base.wrapping_add(self.register_x as u16);
+
+                return addr;
+            }
+
+            Absolute_Y => {
+                let base = self.mem_read_u16(self.counter);
+                let addr = base.wrapping_add(self.register_y as u16);
+
+                return addr;
+            }
+
+            Indirect_X => {
+                let base = self.mem_read(self.counter);
+
+                let ptr: u8 = (base as u8).wrapping_add(self.register_x);
+                let lo = self.mem_read(ptr as u16);
+                let hi = self.mem_read(ptr.wrapping_add(1) as u16);
+
+                return (hi as u16) << 8 | (lo as u16);
+            }
+
+            Indirect_Y => {
+                let base = self.mem_read(self.counter);
+
+                let lo = self.mem_read(base as u16);
+                let hi = self.mem_read((base as u8).wrapping_add(1) as u16);
+                let deref_base = (hi as u16) << 8 | (lo as u16);
+                let deref = deref_base.wrapping_add(self.register_y as u16);
+
+                return deref;
+            }
+            
+            NoneAddressing => {
+                panic!("mode {:?} is not supported", mode);
+            }
+        }
+    }
+
     pub fn run(&mut self) {
         loop {
             let byte_code = self.mem_read(self.counter);
             self.counter += 1;
 
-            let opscode = Opscode::try_from(byte_code);
+            //let opscode = Opscode::try_from(byte_code);
 
-            if opscode.is_err() {
-                return;
-            }
+            // if opscode.is_err() {
+            //     return;
+            // }
 
-            // let a = OPCODE_LDA.IMMEDIATE_0xA9;
             match byte_code {
-                opcodes::LDA::IMMEDIATE_0xA9 => {
-                    
+                BRK_0x00::VALUE => {
+                    self.counter += (BRK_0x00::LEN - 1) as u16;
+                    return;
                 }
-                opcodes::LDA::ZERO_PAGE_0xA5 => {
-                    
+
+                CPY::ABSOLUTE_0xCC::VALUE => {
+                    CPY::execute(self, AddressingMode::Absolute);
+                    self.counter += (CPY::ABSOLUTE_0xCC::LEN - 1) as u16;
+                }
+                
+                // Experimental combined execute
+                // which requires another whole match statement
+                // in order to avoid errors.
+                // I intend to look into macros to solve this problem
+                // instead.
+                LDA::IMMEDIATE_0xA9::VALUE 
+                | LDA::ZERO_PAGE_0xA5::VALUE
+                | LDA::ZERO_PAGE_X_0xB5::VALUE
+                | LDA::ABSOLUTE_0xAD::VALUE
+                | LDA::ABSOLUTE_X_0xBD::VALUE
+                | LDA::ABSOLUTE_Y_0xB9::VALUE
+                | LDA::INDIRECT_X_0xA1::VALUE
+                | LDA::INDIRECT_Y_0xB1::VALUE => {                    
+                    self.counter += (LDA::execute_combined(self, byte_code) - 1) as u16;
+                }
+
+                LDA::IMMEDIATE_0xA9::VALUE => {
+                    LDA::execute(self, AddressingMode::Immediate);
+                    self.counter += (LDA::IMMEDIATE_0xA9::LEN - 1) as u16;                    
+                }
+                LDA::ZERO_PAGE_0xA5::VALUE => {
+                    LDA::execute(self, AddressingMode::ZeroPage);
+                    self.counter += (LDA::ZERO_PAGE_0xA5::LEN - 1) as u16;
+                }
+                LDA::ZERO_PAGE_X_0xB5::VALUE => {
+                    LDA::execute(self, AddressingMode::ZeroPage_X);
+                    self.counter += (LDA::ZERO_PAGE_X_0xB5::LEN - 1) as u16;
+                }
+                LDA::ABSOLUTE_0xAD::VALUE => {
+                    LDA::execute(self, AddressingMode::Absolute);
+                    self.counter += (LDA::ABSOLUTE_0xAD::LEN - 1) as u16;
+                }
+                LDA::ABSOLUTE_X_0xBD::VALUE => {
+                    LDA::execute(self, AddressingMode::Absolute_X);
+                    self.counter += (LDA::ABSOLUTE_X_0xBD::LEN - 1) as u16;
+                }
+                LDA::ABSOLUTE_Y_0xB9::VALUE => {
+                    LDA::execute(self, AddressingMode::Absolute_Y);
+                    self.counter += (LDA::ABSOLUTE_Y_0xB9::LEN - 1) as u16;
+                }
+                LDA::INDIRECT_X_0xA1::VALUE => {
+                    LDA::execute(self, AddressingMode::Indirect_X);
+                    self.counter += (LDA::INDIRECT_X_0xA1::LEN - 1) as u16;
+                }
+                LDA::INDIRECT_Y_0xB1::VALUE => {
+                    LDA::execute(self, AddressingMode::Indirect_Y);
+                    self.counter += (LDA::INDIRECT_Y_0xB1::LEN - 1) as u16;
+                }
+
+                TAX_0xAA::VALUE => {
+                    TAX_0xAA::execute(self);
+                    self.counter += (TAX_0xAA::LEN - 1) as u16;
+                }
+
+                INX_0xE8::VALUE => {
+                    INX_0xE8::execute(self);
+                    self.counter += (INX_0xE8::LEN - 1) as u16;
                 }
 
                 _ => todo!(),
             }
 
-            self.execute(opscode.unwrap())
+            //self.execute(opscode.unwrap())
         }
     }
 
@@ -134,7 +263,7 @@ impl  CPU {
         }
     }
 
-    fn update_flag(&mut self, flag: Flag) {
+    pub fn update_flag(&mut self, flag: Flag) {
         match flag {
             Flag::Carry => todo!(),
             Flag::Zero => {
@@ -170,7 +299,7 @@ enum Opscode {
     INX_0xE8 = 0xE8
 }
 
-enum Flag {
+pub enum Flag {
     Carry,
     Zero,
     InterruptDisable,
