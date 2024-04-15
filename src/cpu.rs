@@ -1,9 +1,7 @@
-use std::u8;
+use std::{ops::BitAnd, u8};
 
 use int_enum::IntEnum;
-use crate::opcodes::{self, *};
-
-use self::LDA::INDIRECT_X_0xA1;
+use crate::opcodes::{*};
 
 pub struct CPU {
     pub register_a: u8,
@@ -21,20 +19,25 @@ const PGRM_ROM_END: u16 = 0xFFFF;
 // Address stored within cartridge which indicates where execution begins
 const PGRM_START_ADDR: u16 = 0xFFFC;
 
-// #[macro_export]
-// macro_rules! execute {
-//     ($cpu:tt, $byte_code:tt, {$($opcode:ident::$param:ident),*,}) => {
-//         match $byte_code {
-//             $(
-//                 $opcode::$param::VALUE => {
-//                     $opcode::$param::execute(&$cpu, AddressingMode::$param);
-//                     $cpu.counter += ($opcode::$param::LEN - 1) as u16;
-//                 }
-//             )*
-//             _ => todo!()
-//         }
-//     }
-// }
+#[macro_export]
+macro_rules! execute {
+    ($cpu:tt, $byte_code:tt, {$($opcode:ident::$mode:ident),*,}) => {
+        match $byte_code {
+            // Need to check specficially for BRK code
+            // since it stops execution.
+            0x00 => {
+                return;
+            }
+
+            $(
+                $opcode::$mode::VALUE => {
+                    $opcode::$mode::execute($cpu);
+                }
+            )*
+            _ => { }
+        }
+    }
+}
 
 impl CPU {
 
@@ -47,6 +50,12 @@ impl CPU {
             counter: 0,
             memory: [0; PGRM_ROM_END as usize]
         }
+    }
+
+    pub fn register_a_add(&mut self, data: u8) {
+        let sum = 
+            self.register_a as u16 + data as u16;
+            todo!();
     }
 
     pub fn mem_read(&self, addr: u16) -> u8 {
@@ -161,118 +170,39 @@ impl CPU {
             let byte_code = self.mem_read(self.counter);
             self.counter += 1;
 
-            //let opscode = Opscode::try_from(byte_code);
+            execute!(self, byte_code, 
+                {
+                    BRK::NONE_ADDRESSING,
 
-            // if opscode.is_err() {
-            //     return;
-            // }
+                    NOP::NONE_ADDRESSING,
 
-            // execute!(self, byte_code, 
-            //     {
-            //         ADC::IMMEDIATE, 
-            //         ADC::ZERO_PAGE, 
-            //         ADC::ZERO_PAGE_X, 
-            //         ADC::ABSOLUTE, 
-            //         ADC::ABSOLUTE_X, 
-            //         ADC::ABSOLUTE_Y,
-            //     }
-            // );
+                    ADC::IMMEDIATE, 
+                    ADC::ZERO_PAGE, 
+                    ADC::ZERO_PAGE_X, 
+                    ADC::ABSOLUTE, 
+                    ADC::ABSOLUTE_X, 
+                    ADC::ABSOLUTE_Y,
 
-            match byte_code {                
+                    CPY::ABSOLUTE,
+                    CPY::IMMEDIATE,
+                    CPY::ZERO_PAGE,
 
-                BRK_0x00::VALUE => {
-                    self.counter += (BRK_0x00::LEN - 1) as u16;
-                    return;
-                }
+                    LDA::ABSOLUTE,
+                    LDA::ABSOLUTE_X,
+                    LDA::ABSOLUTE_Y,
+                    LDA::IMMEDIATE,
+                    LDA::INDIRECT_X,
+                    LDA::INDIRECT_Y,
+                    LDA::ZERO_PAGE,
+                    LDA::ZERO_PAGE_X,
 
-                CPY::ABSOLUTE_0xCC::VALUE => {
-                    CPY::execute(self, AddressingMode::ABSOLUTE);
-                    self.counter += (CPY::ABSOLUTE_0xCC::LEN - 1) as u16;
-                }
-                
-                
+                    TAX_0AA::NONE_ADDRESSING,
 
-                LDA::IMMEDIATE_0xA9::VALUE => {
-                    LDA::execute(self, AddressingMode::IMMEDIATE);
-                    self.counter += (LDA::IMMEDIATE_0xA9::LEN - 1) as u16;                    
+                    INX_0xE8::NONE_ADDRESSING,
                 }
-                LDA::ZERO_PAGE_0xA5::VALUE => {
-                    LDA::execute(self, AddressingMode::ZERO_PAGE);
-                    self.counter += (LDA::ZERO_PAGE_0xA5::LEN - 1) as u16;
-                }
-                LDA::ZERO_PAGE_X_0xB5::VALUE => {
-                    LDA::execute(self, AddressingMode::ZERO_PAGE_X);
-                    self.counter += (LDA::ZERO_PAGE_X_0xB5::LEN - 1) as u16;
-                }
-                LDA::ABSOLUTE_0xAD::VALUE => {
-                    LDA::execute(self, AddressingMode::ABSOLUTE);
-                    self.counter += (LDA::ABSOLUTE_0xAD::LEN - 1) as u16;
-                }
-                LDA::ABSOLUTE_X_0xBD::VALUE => {
-                    LDA::execute(self, AddressingMode::ABSOLUTE_X);
-                    self.counter += (LDA::ABSOLUTE_X_0xBD::LEN - 1) as u16;
-                }
-                LDA::ABSOLUTE_Y_0xB9::VALUE => {
-                    LDA::execute(self, AddressingMode::ABSOLUTE_Y);
-                    self.counter += (LDA::ABSOLUTE_Y_0xB9::LEN - 1) as u16;
-                }
-                LDA::INDIRECT_X_0xA1::VALUE => {
-                    LDA::execute(self, AddressingMode::INDIRECT_X);
-                    self.counter += (LDA::INDIRECT_X_0xA1::LEN - 1) as u16;
-                }
-                LDA::INDIRECT_Y_0xB1::VALUE => {
-                    LDA::execute(self, AddressingMode::INDIRECT_Y);
-                    self.counter += (LDA::INDIRECT_Y_0xB1::LEN - 1) as u16;
-                }
-
-                TAX_0xAA::VALUE => {
-                    TAX_0xAA::execute(self);
-                    self.counter += (TAX_0xAA::LEN - 1) as u16;
-                }
-
-                INX_0xE8::VALUE => {
-                    INX_0xE8::execute(self);
-                    self.counter += (INX_0xE8::LEN - 1) as u16;
-                }
-
-                _ => todo!(),
-            }
+            );
 
             //self.execute(opscode.unwrap())
-        }
-    }
-
-    fn execute(&mut self, opscode: Opscode) {
-            
-        match opscode {
-            Opscode::BRK_0x00 => {
-                // https://www.nesdev.org/obelisk-6502-guide/reference.html#BRK
-                return;
-            },
-            Opscode::LDA_0xA9 => {
-                // https://www.nesdev.org/obelisk-6502-guide/reference.html#LDA
-                // Gets param which is in counter after += (1 after function call)
-                let param = self.mem_read(self.counter);
-                self.counter += 1;
-                self.register_a = param;
-
-                self.update_flag(Flag::Zero);
-                self.update_flag(Flag::Negative);
-            },
-            Opscode::TAX_0xAA => {
-                // https://www.nesdev.org/obelisk-6502-guide/reference.html#TAX
-                self.register_x = self.register_a;
-
-                self.update_flag(Flag::Zero);
-                self.update_flag(Flag::Negative);
-            },
-            Opscode::INX_0xE8 => {
-                // https://www.nesdev.org/obelisk-6502-guide/reference.html#INX
-                self.register_x = self.register_x.wrapping_add(1);
-
-                self.update_flag(Flag::Zero);
-                self.update_flag(Flag::Negative);
-            }
         }
     }
 
@@ -290,6 +220,7 @@ impl CPU {
             Flag::InterruptDisable => todo!(),
             Flag::DecimalMode => todo!(),
             Flag::BreakCommand => todo!(),
+            Flag::BreakCommand2 => todo!(),
             Flag::Overflow => todo!(),
             Flag::Negative => {
                 if self.register_a & 0b1000_0000 != 0 {
@@ -312,12 +243,14 @@ enum Opscode {
     INX_0xE8 = 0xE8
 }
 
+#[repr(u8)]
 pub enum Flag {
-    Carry,
-    Zero,
-    InterruptDisable,
-    DecimalMode,
-    BreakCommand,
-    Overflow,
-    Negative
+    Carry = 0b00000001,
+    Zero = 0b00000010,
+    InterruptDisable = 0b00000100,
+    DecimalMode = 0b00001000,
+    BreakCommand = 0b00010000,
+    BreakCommand2 = 0b00100000,
+    Overflow = 0b01000000,
+    Negative = 0b10000000
 }

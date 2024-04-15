@@ -22,7 +22,7 @@ fn main() {
 
 #[cfg(test)]
 mod test {
-    use crate::opcodes::{BRK_0x00, LDA};
+    use crate::opcodes::{BRK, LDA};
 
     use super::*;
  
@@ -30,9 +30,10 @@ mod test {
 fn test_0xa9_lda_immediate_load_data() {
     let mut cpu: CPU = CPU::new();
     let program = vec![
-        0xA9, 
+        LDA::IMMEDIATE::VALUE, 
         0x05, 
-        0x00];
+        BRK::NONE_ADDRESSING::VALUE
+    ];
 
     cpu.load_and_run(program);
 
@@ -44,9 +45,10 @@ fn test_0xa9_lda_immediate_load_data() {
 fn test_0xa9_lda_zero_flag() {
     let mut cpu: CPU = CPU::new();
     let program = vec![
-        LDA::IMMEDIATE_0xA9::VALUE, 
-        BRK_0x00::VALUE, 
-        BRK_0x00::VALUE];
+        LDA::IMMEDIATE::VALUE, 
+        BRK::NONE_ADDRESSING::VALUE, 
+        BRK::NONE_ADDRESSING::VALUE
+    ];
 
     cpu.load_and_run(program);
     
@@ -57,8 +59,9 @@ fn test_0xa9_lda_zero_flag() {
 fn test_0xaa_tax_move_a_to_x() {
         let mut cpu: CPU = CPU::new();
         let program = vec![
-            0xaa, 
-            0x00];
+            0xAA, 
+            0x00
+        ];
         
         cpu.load(program);
         cpu.reset_interrupt();
@@ -73,11 +76,12 @@ fn test_5_ops_working_together() {
         let mut cpu: CPU = CPU::new();
         
         let program = vec![
-            LDA::IMMEDIATE_0xA9::VALUE, 
+            LDA::IMMEDIATE::VALUE, 
             0xC0,
             0xAA, 
             0xE8, 
-            0x00];
+            0x00
+        ];
 
         cpu.load_and_run(program);
 
@@ -90,7 +94,8 @@ fn test_int_overflow() {
     let program = vec![
         0xe8, 
         0xe8, 
-        0x00];
+        0x00
+    ];
 
     cpu.load(program);
     cpu.reset_interrupt();
