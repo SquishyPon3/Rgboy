@@ -1,35 +1,43 @@
+
 /// Generates an opcode and its various specific params
 #[macro_export]
+#[allow(unused)]
 macro_rules! opcode {
-    ($($name:ident [$(($value:tt, $length:tt, $cycles:tt, $mode:ident)),*,]),*) => (
-        use crate::cpu::{CPU, Flag};
+    ($($name:ident $exec:expr, [$(($value:tt, $length:tt, $cycles:tt, $mode:ident)),*,]),*) => (
 
+        #[allow(non_camel_case_types, unused, non_snake_case)]
         $(pub mod $name {
             // pub const modes: [crate::opcodes::AddressingMode; 10] = [
             //     $(crate::opcodes::AddressingMode::$mode,)*
             // ];
             $(
+                #[allow(non_camel_case_types, unused, non_snake_case)]
                 pub mod $mode {
                     pub const VALUE: u8 = $value;
                     pub const LEN: u8 = $length;
                     pub const CYCLES: u8 = $cycles;
-                    
-                    // Dynamically build this with a provided expr argument?
-                    // pub fn execute(
-                    //     cpu: &mut crate::cpu::CPU, 
-                    //     mode: crate::opcodes::AddressingMode) 
-                    // {
-                    //     cpu.counter += (LEN - 1) as u16;
-                    // }
-                }
+                    pub fn execute(cpu: &mut crate::cpu::CPU) {
+                        super::execute(cpu, crate::opcodes::AddressingMode::$mode);
+                        
+                        cpu.counter += (super::$mode::LEN - 1) as u16;
+                    }
+                }                    
             )*
+            
+            // Dynamically build this with a provided expr argument?
+            pub fn execute(
+                cpu: &mut crate::cpu::CPU, 
+                mode: crate::opcodes::AddressingMode) 
+            {
+                $exec(cpu, mode);
+            }
         })*
 
         // pub fn execute(cpu: &CPU, byte_code: u8) {
-        //     match {
+        //     match byte_code {
         //         $($(
         //             $name::$mode::VALUE => {
-        //                 $name::$mode::execute(cpu, AddressingMode::$mode)
+        //                 $name::$mode::execute(cpu, AddressingMode::$mode);
         //                 cpu.counter += ($name::$mode::LEN - 1) as u16;
         //             }
         //         )*)*
@@ -52,7 +60,16 @@ macro_rules! opcode {
 // }
 
 opcode![
-    ADC [
+    ADC |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        todo!();
+        // use crate::cpu::Flag;
+        // let addr = cpu.get_operand_addr(mode);
+        // let val = cpu.mem_read(addr);
+
+        // cpu.register_y = val;
+        // cpu.update_flag(Flag::Zero);
+        // cpu.update_flag(Flag::Carry);
+    }, [
         (0x69, 2, 2, IMMEDIATE),
         (0x65, 2, 3, ZERO_PAGE),
         (0x75, 2, 4, ZERO_PAGE_X),
@@ -62,7 +79,10 @@ opcode![
         (0x61, 2, 6, INDIRECT_X),
         (0x71, 2, 5, INDIRECT_Y),
     ],
-    AND [
+
+    AND |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        todo!();
+    }, [
         (0x29, 2, 2, IMMEDIATE), 
         (0x25, 2, 3, ZERO_PAGE),
         (0x35, 2, 4, ZERO_PAGE_X),
