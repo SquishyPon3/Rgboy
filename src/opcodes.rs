@@ -4,7 +4,6 @@
 #[allow(unused)]
 macro_rules! opcode {
     ($($name:ident $exec:expr, [$(($value:tt, $length:tt, $cycles:tt, $mode:ident)),*,]),*) => (
-
         #[allow(non_camel_case_types, unused, non_snake_case)]
         $(pub mod $name {
             // pub const modes: [crate::opcodes::AddressingMode; 10] = [
@@ -32,17 +31,6 @@ macro_rules! opcode {
                 $exec(cpu, mode);
             }
         })*
-
-        // pub fn execute(cpu: &CPU, byte_code: u8) {
-        //     match byte_code {
-        //         $($(
-        //             $name::$mode::VALUE => {
-        //                 $name::$mode::execute(cpu, AddressingMode::$mode);
-        //                 cpu.counter += ($name::$mode::LEN - 1) as u16;
-        //             }
-        //         )*)*
-        //     }
-        // }
     )
 }
 
@@ -100,13 +88,30 @@ opcode![
     ],
 
     /* Shifts */
+    CPX |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Memory, Flag};
+
+        let addr = cpu.get_operand_addr(mode);
+        let val = cpu.mem_read(addr);
+
+        cpu.register_x = val;
+        cpu.update_flag(Flag::Zero);
+        cpu.update_flag(Flag::Carry);
+    }, [
+        (0xE0, 2, 2, IMMEDIATE),
+        (0xE4, 2, 3, ZERO_PAGE),
+        (0xEC, 3, 4, ABSOLUTE),
+    ],
+
     CPY |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Memory, Flag};
+
         let addr = cpu.get_operand_addr(mode);
         let val = cpu.mem_read(addr);
 
         cpu.register_y = val;
-        cpu.update_flag(crate::cpu::Flag::Zero);
-        cpu.update_flag(crate::cpu::Flag::Carry);
+        cpu.update_flag(Flag::Zero);
+        cpu.update_flag(Flag::Carry);
     }, [
         (0xC0, 2, 2, IMMEDIATE),
         (0xC4, 2, 3, ZERO_PAGE),
@@ -115,21 +120,57 @@ opcode![
 
     /* Stores & Loads */
     LDA |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Memory, Flag};
+
         let addr = cpu.get_operand_addr(mode);
         let val = cpu.mem_read(addr);
 
         cpu.register_a = val;
-        cpu.update_flag(crate::cpu::Flag::Zero);
-        cpu.update_flag(crate::cpu::Flag::Negative);
+        cpu.update_flag(Flag::Zero);
+        cpu.update_flag(Flag::Negative);
     }, [
         (0xA9, 2, 2, IMMEDIATE),
         (0xA5, 2, 3, ZERO_PAGE),
         (0xB5, 2, 4, ZERO_PAGE_X),
-        (0xAD, 3, 4, ABSOLUTE),
+        (0xAD, 3, 4, ABSOLUTE), // +1 if page crossed
         (0xBD, 3, 4, ABSOLUTE_X),
-        (0xB9, 3, 4, ABSOLUTE_Y),
+        (0xB9, 3, 4, ABSOLUTE_Y), // +1 if page crossed 
         (0xA1, 2, 6, INDIRECT_X),
-        (0xB1, 2, 5, INDIRECT_Y),
+        (0xB1, 2, 5, INDIRECT_Y), // +1 if page crossed
+    ],
+
+    LDX |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Memory, Flag};
+
+        let addr = cpu.get_operand_addr(mode);
+        let val = cpu.mem_read(addr);
+
+        cpu.register_x = val;
+        cpu.update_flag(Flag::Zero);
+        cpu.update_flag(Flag::Negative);
+    }, [
+        (0xA2, 2, 2, IMMEDIATE),
+        (0xA6, 2, 3, ZERO_PAGE),
+        (0xB6, 2, 4, ZERO_PAGE_Y),
+        (0xAE, 3, 4, ABSOLUTE),
+        (0xBE, 3, 4, ABSOLUTE_Y), // +1 if page crossed
+    ],
+
+    LDY |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Memory, Flag};
+
+        let addr = cpu.get_operand_addr(mode);
+        let val = cpu.mem_read(addr);
+
+        cpu.register_y = val;
+        cpu.update_flag(Flag::Zero);
+        cpu.update_flag(Flag::Negative);
+    }, [
+        (0xA0, 2, 2, IMMEDIATE),
+        (0xA4, 2, 3, ZERO_PAGE),
+        (0xB4, 2, 4, ZERO_PAGE_X),
+        (0xAC, 3, 4, ABSOLUTE),
+        (0xBC, 3, 4, ABSOLUTE_X), // +1 if page crossed
     ],
 
     /* Flags clear */

@@ -22,7 +22,9 @@ fn main() {
 
 #[cfg(test)]
 mod test {
-    use crate::opcodes::{BRK, LDA};
+    use std::ops::BitAnd;
+
+    use crate::{cpu::Flag, opcodes::{INX_0xE8, BRK, CPY, LDA, TAX_0AA}};
 
     use super::*;
  
@@ -37,8 +39,12 @@ fn test_0xa9_lda_immediate_load_data() {
 
     cpu.load_and_run(program);
 
-    assert!(cpu.status & 0b0000_0010 == 0b00);
-    assert!(cpu.status & 0b1000_0000 == 0);
+    assert!(
+        cpu.status & Flag::from_bits_truncate(0b0000_0010) 
+        == Flag::from_bits_retain(0b00));
+    assert!(
+        cpu.status & Flag::from_bits_truncate(0b1000_0000) 
+        == Flag::from_bits_retain(0));
 }
 
 #[test]
@@ -46,21 +52,23 @@ fn test_0xa9_lda_zero_flag() {
     let mut cpu: CPU = CPU::new();
     let program = vec![
         LDA::IMMEDIATE::VALUE, 
-        BRK::NONE_ADDRESSING::VALUE, 
+        0x00, 
         BRK::NONE_ADDRESSING::VALUE
     ];
 
     cpu.load_and_run(program);
     
-    assert!(cpu.status & 0b0000_0010 == 0b10);
+    assert!(
+        cpu.status & Flag::from_bits_truncate(0b0000_0010) 
+        == Flag::from_bits_retain(0b10));
 }
 
 #[test]
 fn test_0xaa_tax_move_a_to_x() {
         let mut cpu: CPU = CPU::new();
         let program = vec![
-            0xAA, 
-            0x00
+            TAX_0AA::NONE_ADDRESSING::VALUE, 
+            BRK::NONE_ADDRESSING::VALUE
         ];
         
         cpu.load(program);
@@ -77,10 +85,10 @@ fn test_5_ops_working_together() {
         
         let program = vec![
             LDA::IMMEDIATE::VALUE, 
-            0xC0,
-            0xAA, 
-            0xE8, 
-            0x00
+            CPY::IMMEDIATE::VALUE,
+            TAX_0AA::NONE_ADDRESSING::VALUE, 
+            INX_0xE8::NONE_ADDRESSING::VALUE, 
+            BRK::NONE_ADDRESSING::VALUE
         ];
 
         cpu.load_and_run(program);
@@ -92,9 +100,9 @@ fn test_5_ops_working_together() {
 fn test_int_overflow() {
     let mut cpu: CPU = CPU::new();
     let program = vec![
-        0xe8, 
-        0xe8, 
-        0x00
+        INX_0xE8::NONE_ADDRESSING::VALUE, 
+        INX_0xE8::NONE_ADDRESSING::VALUE, 
+        BRK::NONE_ADDRESSING::VALUE
     ];
 
     cpu.load(program);

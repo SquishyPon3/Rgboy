@@ -1,14 +1,17 @@
-use std::{ops::BitAnd, u8};
+use std::{ops::{BitAnd, BitOr, BitOrAssign}, u8};
 
 use int_enum::IntEnum;
 use crate::opcodes::{*};
+use bitflags::bitflags;
 
 pub struct CPU {
     pub register_a: u8,
     pub register_x: u8,
     pub register_y: u8,
-    pub status: u8,
+    pub status: Flag,
     pub counter: u16,
+    // The length of the stack STACK_START + stack_pointer to get end of stack
+    pub stack_pointer: u8,
     // [0x80000 .. 0xFFFF] Program ROM
     memory: [u8; PGRM_ROM_END as usize]
 }
@@ -18,6 +21,9 @@ const PGRM_ROM_START: u16 = 0x8000;
 const PGRM_ROM_END: u16 = 0xFFFF;
 // Address stored within cartridge which indicates where execution begins
 const PGRM_START_ADDR: u16 = 0xFFFC;
+
+const STACK: u16 = 0x0100;
+const STACK_RESET: u8 = 0xFD;
 
 #[macro_export]
 macro_rules! execute {
@@ -39,6 +45,34 @@ macro_rules! execute {
     }
 }
 
+pub trait Memory {
+    fn mem_read(&self, addr: u16) -> u8;
+
+    fn mem_write(&mut self, addr: u16, data: u8);
+
+    fn mem_read_u16(&self, pos: u16) -> u16 {
+        return u16::from_le_bytes(
+            [self.mem_read(pos), self.mem_read(pos + 1)]
+        );
+    }
+
+    fn mem_write_u16(&mut self, pos: u16, data: u16) {
+        let bytes = data.to_le_bytes();
+        self.mem_write(pos, bytes[0]);
+        self.mem_write(pos + 1, bytes[1]);
+    }
+}
+
+impl Memory for CPU {
+    fn mem_read(&self, addr: u16) -> u8 {
+        return self.memory[addr as usize];
+    }
+
+    fn mem_write(&mut self, addr: u16, data: u8) {
+        self.memory[addr as usize] = data;
+    }
+}
+
 impl CPU {
 
     pub fn new() -> Self {
@@ -46,8 +80,9 @@ impl CPU {
             register_a: 0,
             register_x: 0,
             register_y: 0,
-            status: 0,
+            status: Flag::from_bits_truncate(0b100100),
             counter: 0,
+            stack_pointer: STACK_RESET,
             memory: [0; PGRM_ROM_END as usize]
         }
     }
@@ -58,34 +93,29 @@ impl CPU {
             todo!();
     }
 
-    pub fn mem_read(&self, addr: u16) -> u8 {
-        self.memory[addr as usize]
-    }
-
-    fn mem_read_u16(&self, pos: u16) -> u16 {
-        return u16::from_le_bytes(
-            [self.mem_read(pos), self.mem_read(pos + 1)]
-        );
-    }
-
-    fn mem_write(&mut self, addr: u16, data: u8) {
-        self.memory[addr as usize] = data;
-    }
-
-    fn mem_write_u16(&mut self, pos: u16, data: u16) {
-        let bytes = data.to_le_bytes();
-        self.mem_write(pos, bytes[0]);
-        self.mem_write(pos + 1, bytes[1]);
-    }
-
     // Resets the state (register and flags) and sets counter to cart start addr
     pub fn reset_interrupt(&mut self) {
         // reset method should restore the state of all registers, and initialize program_counter by the 2-byte value stored at 0xFFFC
         self.register_a = 0;
         self.register_x = 0;
         self.register_y = 0;
-        self.status = 0;
-        self.counter = self.mem_read_u16(PGRM_START_ADDR)
+        self.status = Flag::from_bits_truncate(0b100100);
+        self.counter = self.mem_read_u16(PGRM_START_ADDR);
+        self.stack_pointer = STACK_RESET;
+    }
+
+    pub fn compare(&mut self, mode: AddressingMode, val: u8) {
+        let addr = self.get_operand_addr(mode);
+        let data = self.mem_read(addr);
+        if data <= val {
+            self.status.insert(Flag::Carry);
+        } else {
+            self.status.remove(Flag::Carry);  
+        }
+        
+        self.update_flag(
+            Flag::from_bits_truncate(val.wrapping_sub(data)
+        ));
     }
 
     pub fn load(&mut self, program: Vec<u8>) {
@@ -207,14 +237,17 @@ impl CPU {
     }
 
     pub fn update_flag(&mut self, flag: Flag) {
+
         match flag {
             Flag::Carry => todo!(),
             Flag::Zero => {
                 if self.register_a == 0 {
-                    self.status = self.status | 0b0000_0010;                        
+                    self.status = self.status.bitor(
+                        Flag::from_bits_truncate(0b0000_0010));                        
                 }
                 else {
-                    self.status = self.status & 0b1111_1101;
+                    self.status = self.status.bitand(
+                        Flag::from_bits_truncate(0b1111_1101));
                 }
             },
             Flag::InterruptDisable => todo!(),
@@ -224,33 +257,30 @@ impl CPU {
             Flag::Overflow => todo!(),
             Flag::Negative => {
                 if self.register_a & 0b1000_0000 != 0 {
-                    self.status = self.status | 0b1000_0000;
+                    self.status = self.status.bitor(
+                        Flag::from_bits_truncate(0b1000_0000));
                 }
                 else {
-                    self.status = self.status & 0b0111_1111;
+                    self.status = self.status.bitand(
+                        Flag::from_bits_truncate(0b0111_1111));
                 }
             },
+            _ => todo!()
         }
     }
 }
 
-#[repr(u8)]
-#[derive(Debug, PartialEq, IntEnum)]
-enum Opscode {
-    BRK_0x00 = 0x00,
-    LDA_0xA9 = 0xA9,
-    TAX_0xAA = 0xAA,
-    INX_0xE8 = 0xE8
-}
-
-#[repr(u8)]
-pub enum Flag {
-    Carry = 0b00000001,
-    Zero = 0b00000010,
-    InterruptDisable = 0b00000100,
-    DecimalMode = 0b00001000,
-    BreakCommand = 0b00010000,
-    BreakCommand2 = 0b00100000,
-    Overflow = 0b01000000,
-    Negative = 0b10000000
+bitflags! {
+    #[derive(PartialEq, Eq)]
+    #[derive(Clone, Copy)]
+    pub struct Flag: u8 {
+        const Carry = 0b0000_0001;
+        const Zero = 0b0000_0010;
+        const InterruptDisable = 0b0000_0100;
+        const DecimalMode = 0b0000_1000;
+        const BreakCommand = 0b000_10000;
+        const BreakCommand2 = 0b0010_0000;
+        const Overflow = 0b0100_0000;
+        const Negative = 0b1000_0000;
+    }
 }
