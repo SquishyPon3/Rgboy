@@ -282,6 +282,36 @@ opcode![
         cpu.update_flag(crate::cpu::Flag::Negative, cpu.register_y);
     }, [
         (0xE8, 1, 2, NONE_ADDRESSING),
+    ],
+
+    CLD |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        cpu.status.remove(crate::cpu::Flag::DecimalMode);  
+    }, [
+        (0xD8, 1, 2, NONE_ADDRESSING),
+    ],
+
+    CLI |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        cpu.status.remove(crate::cpu::Flag::InterruptDisable);  
+    }, [
+        (0x58, 1, 2, NONE_ADDRESSING),
+    ],
+
+    CLV |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        cpu.status.remove(crate::cpu::Flag::Overflow);  
+    }, [
+        (0xB8, 1, 2, NONE_ADDRESSING),
+    ],
+
+    CLC |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        cpu.status.remove(crate::cpu::Flag::Carry);  
+    }, [
+        (0x18, 1, 2, NONE_ADDRESSING),
+    ],
+
+    SEC |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        cpu.status.remove(crate::cpu::Flag::Overflow);  
+    }, [
+        (0x38, 1, 2, NONE_ADDRESSING),
     ]
 
     /* Stack */
