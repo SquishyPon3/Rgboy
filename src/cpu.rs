@@ -128,7 +128,7 @@ impl CPU {
     pub fn compare(&mut self, mode: AddressingMode, value: u8) {
         let addr = self.get_operand_addr(mode);
         let data = self.mem_read(addr);
-        
+
         if data <= value {
             self.status.insert(Flag::Carry);
         } else {
@@ -141,6 +141,43 @@ impl CPU {
         self.update_flag(
             Flag::Negative,
             value.wrapping_sub(data));
+    }
+    
+    pub fn logical_shift_right_a(&mut self) {
+
+        let mut data = self.register_a;
+
+        match data & 1 {
+            1 => self.status.insert(Flag::Carry),
+            _ => self.status.remove(Flag::Carry)
+        }
+
+        data = data >> 1;
+        self.register_a = data;
+
+        self.update_flag(Flag::Zero, self.register_a);
+        self.update_flag(Flag::Negative, self.register_a);
+
+        return;
+    }
+
+    pub fn logical_shift_right(&mut self, mode: AddressingMode) -> u8 {
+
+        let addr = self.get_operand_addr(mode);
+        let mut data = self.mem_read(addr);
+
+        match data & 1 {
+            1 => self.status.insert(Flag::Carry),
+            _ => self.status.remove(Flag::Carry)
+        }
+
+        data = data >> 1;
+        self.mem_write(addr, data);
+
+        self.update_flag(Flag::Zero, data);
+        self.update_flag(Flag::Negative, data);
+        
+        return data;
     }
 
     pub fn load_into(&mut self, mode: AddressingMode, register: Register) {
