@@ -88,9 +88,30 @@ impl CPU {
     }
 
     pub fn register_a_add(&mut self, data: u8) {
-        let sum = 
-            self.register_a as u16 + data as u16;
-            todo!();
+        let sum = self.register_a as u16 
+            + data as u16
+            + (match self.status.contains(Flag::Carry) {
+                true => 1,
+                false => 0
+            }) as u16;
+
+        let carry = sum > 0xFF;
+
+        match carry {
+            true => {self.status.insert(Flag::Carry);}
+            false => {self.status.remove(Flag::Carry);}
+        }
+
+        let result = sum as u8;
+
+        match (data ^ result) & (result ^ self.register_a) & 0x90 {
+            0 => {self.status.remove(Flag::Overflow);}
+            _ => {self.status.insert(Flag::Overflow);}
+        }
+        
+        self.register_a = result;
+        self.update_flag(Flag::Zero, self.register_a);
+        self.update_flag(Flag::Negative, self.register_a);
     }
 
     // Resets the state (register and flags) and sets counter to cart start addr
@@ -104,18 +125,84 @@ impl CPU {
         self.stack_pointer = STACK_RESET;
     }
 
-    pub fn compare(&mut self, mode: AddressingMode, val: u8) {
+    pub fn compare(&mut self, mode: AddressingMode, value: u8) {
         let addr = self.get_operand_addr(mode);
         let data = self.mem_read(addr);
-        if data <= val {
+        
+        if data <= value {
             self.status.insert(Flag::Carry);
         } else {
             self.status.remove(Flag::Carry);  
         }
         
         self.update_flag(
-            Flag::from_bits_truncate(val.wrapping_sub(data)
-        ));
+            Flag::Zero, 
+            value.wrapping_sub(data));
+        self.update_flag(
+            Flag::Negative,
+            value.wrapping_sub(data));
+    }
+
+    pub fn load_into(&mut self, mode: AddressingMode, register: Register) {
+        let addr = self.get_operand_addr(mode);
+        let val = self.mem_read(addr);
+
+        match register {
+            Register::A => {
+                self.register_a = val;
+                self.update_flag(Flag::Zero, self.register_a);
+                self.update_flag(Flag::Negative, self.register_a);
+            }
+            Register::X => {
+                self.register_x = val;
+                self.update_flag(Flag::Zero, self.register_x);
+                self.update_flag(Flag::Negative, self.register_x);
+            },
+            Register::Y => {
+                self.register_y = val;
+                self.update_flag(Flag::Zero, self.register_y);
+                self.update_flag(Flag::Negative, self.register_y);
+            },
+        }
+    }
+
+    pub fn decrement_memory(&mut self, mode: AddressingMode) -> u8 {
+        let addr: u16 = self.get_operand_addr(mode);
+        let mut data: u8 = self.mem_read(addr);
+
+        data = data.wrapping_sub(1);
+
+        self.mem_write(addr, data);
+
+        self.update_flag(Flag::Zero, data);
+        self.update_flag(Flag::Negative, data);
+
+        return data;
+    }
+    
+    pub fn decrement_x(&mut self, mode: AddressingMode) {
+        self.register_x = self.register_x.wrapping_sub(1);
+        self.update_flag(Flag::Zero, self.register_x);
+        self.update_flag(Flag::Negative, self.register_x);
+    }
+
+    pub fn decrement_y(&mut self, mode: AddressingMode) {
+        self.register_y = self.register_y.wrapping_sub(1);
+        self.update_flag(Flag::Zero, self.register_y);
+        self.update_flag(Flag::Negative, self.register_y);
+    }
+
+    pub fn increment_memory(&mut self, mode: AddressingMode) -> u8 {
+        let addr = self.get_operand_addr(mode);
+        let mut data = self.mem_read(addr);
+
+        data = data.wrapping_add(1);
+
+        self.mem_write(addr, data);
+        self.update_flag(Flag::Zero, data);
+        self.update_flag(Flag::Zero, data);
+        
+        return data;
     }
 
     pub fn load(&mut self, program: Vec<u8>) {
@@ -236,18 +323,16 @@ impl CPU {
         }
     }
 
-    pub fn update_flag(&mut self, flag: Flag) {
-
+    pub fn update_flag(&mut self, flag: Flag, register: u8) {
+        
         match flag {
             Flag::Carry => todo!(),
             Flag::Zero => {
-                if self.register_a == 0 {
-                    self.status = self.status.bitor(
-                        Flag::from_bits_truncate(0b0000_0010));                        
+                if register == 0 {
+                    self.status.insert(Flag::Zero);                       
                 }
                 else {
-                    self.status = self.status.bitand(
-                        Flag::from_bits_truncate(0b1111_1101));
+                    self.status.remove(Flag::Zero);
                 }
             },
             Flag::InterruptDisable => todo!(),
@@ -256,13 +341,11 @@ impl CPU {
             Flag::BreakCommand2 => todo!(),
             Flag::Overflow => todo!(),
             Flag::Negative => {
-                if self.register_a & 0b1000_0000 != 0 {
-                    self.status = self.status.bitor(
-                        Flag::from_bits_truncate(0b1000_0000));
+                if register >> 1 == 1 {
+                    self.status.insert(Flag::Negative);
                 }
                 else {
-                    self.status = self.status.bitand(
-                        Flag::from_bits_truncate(0b0111_1111));
+                    self.status.remove(Flag::Negative);
                 }
             },
             _ => todo!()
@@ -283,4 +366,10 @@ bitflags! {
         const Overflow = 0b0100_0000;
         const Negative = 0b1000_0000;
     }
+}
+
+pub enum Register {
+    A,
+    X,
+    Y       
 }

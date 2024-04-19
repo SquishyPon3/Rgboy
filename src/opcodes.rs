@@ -34,6 +34,10 @@ macro_rules! opcode {
     )
 }
 
+// macro_rules! set_bitflags {
+
+// }
+
 // Need to find a way to make opcode! macro able to take in
 // multiple opcodes in order to also generate a pub execute function
 // which can match to which opcode / params and run their specific
@@ -62,7 +66,12 @@ opcode![
 
     /* Arithmetic */
     ADC |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
-        return;
+        use crate::cpu::{CPU, Memory};
+
+        let addr = cpu.get_operand_addr(mode);
+        let value = cpu.mem_read(addr);
+        
+        cpu.register_a_add(value);
     }, [
         (0x69, 2, 2, IMMEDIATE),
         (0x65, 2, 3, ZERO_PAGE),
@@ -75,7 +84,13 @@ opcode![
     ],
 
     AND |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
-        return;
+        use crate::cpu::Memory;
+
+        let addr = cpu.get_operand_addr(mode);
+        let val = cpu.mem_read(addr);
+
+        cpu.register_a &= val;
+        todo!("This does not do any evaluation yet, or set any flags...");
     }, [
         (0x29, 2, 2, IMMEDIATE), 
         (0x25, 2, 3, ZERO_PAGE),
@@ -87,16 +102,34 @@ opcode![
         (0x31, 2, 5, INDIRECT_Y),
     ],
 
+    DEC |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        cpu.decrement_memory(mode);
+    }, [
+        (0x25, 2, 5, ZERO_PAGE),
+        (0x35, 2, 6, ZERO_PAGE_X),
+        (0x2D, 3, 6, ABSOLUTE),
+        (0x29, 3, 7, ABSOLUTE_X), 
+    ],
+
     /* Shifts */
+    CMP |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Memory, Flag};
+        cpu.compare(mode, cpu.register_a);
+    }, [
+        (0xC9, 2, 2, IMMEDIATE),
+        (0xC5, 2, 3, ZERO_PAGE),
+        (0xD5, 2, 4, ZERO_PAGE_X),
+        (0xCD, 2, 4, ABSOLUTE),
+        (0xDD, 3, 4, ABSOLUTE_X), // +1 if page crossed
+        (0xD9, 3, 4, ABSOLUTE_Y), // +1 if page crossed
+        (0xC1, 2, 6, INDIRECT_X),
+        (0xD1, 2, 5, INDIRECT_Y), // +1 if page crossed
+    ],
+
     CPX |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
         use crate::cpu::{Memory, Flag};
 
-        let addr = cpu.get_operand_addr(mode);
-        let val = cpu.mem_read(addr);
-
-        cpu.register_x = val;
-        cpu.update_flag(Flag::Zero);
-        cpu.update_flag(Flag::Carry);
+        cpu.compare(mode, cpu.register_x);
     }, [
         (0xE0, 2, 2, IMMEDIATE),
         (0xE4, 2, 3, ZERO_PAGE),
@@ -106,12 +139,7 @@ opcode![
     CPY |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
         use crate::cpu::{Memory, Flag};
 
-        let addr = cpu.get_operand_addr(mode);
-        let val = cpu.mem_read(addr);
-
-        cpu.register_y = val;
-        cpu.update_flag(Flag::Zero);
-        cpu.update_flag(Flag::Carry);
+        cpu.compare(mode, cpu.register_y)
     }, [
         (0xC0, 2, 2, IMMEDIATE),
         (0xC4, 2, 3, ZERO_PAGE),
@@ -120,14 +148,9 @@ opcode![
 
     /* Stores & Loads */
     LDA |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
-        use crate::cpu::{Memory, Flag};
+        use crate::cpu::{Register};
 
-        let addr = cpu.get_operand_addr(mode);
-        let val = cpu.mem_read(addr);
-
-        cpu.register_a = val;
-        cpu.update_flag(Flag::Zero);
-        cpu.update_flag(Flag::Negative);
+        cpu.load_into(mode, Register::A);
     }, [
         (0xA9, 2, 2, IMMEDIATE),
         (0xA5, 2, 3, ZERO_PAGE),
@@ -140,14 +163,9 @@ opcode![
     ],
 
     LDX |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
-        use crate::cpu::{Memory, Flag};
+        use crate::cpu::{Register};
 
-        let addr = cpu.get_operand_addr(mode);
-        let val = cpu.mem_read(addr);
-
-        cpu.register_x = val;
-        cpu.update_flag(Flag::Zero);
-        cpu.update_flag(Flag::Negative);
+        cpu.load_into(mode, Register::X);
     }, [
         (0xA2, 2, 2, IMMEDIATE),
         (0xA6, 2, 3, ZERO_PAGE),
@@ -157,14 +175,9 @@ opcode![
     ],
 
     LDY |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
-        use crate::cpu::{Memory, Flag};
+        use crate::cpu::{Register};
 
-        let addr = cpu.get_operand_addr(mode);
-        let val = cpu.mem_read(addr);
-
-        cpu.register_y = val;
-        cpu.update_flag(Flag::Zero);
-        cpu.update_flag(Flag::Negative);
+        cpu.load_into(mode, Register::Y);
     }, [
         (0xA0, 2, 2, IMMEDIATE),
         (0xA4, 2, 3, ZERO_PAGE),
@@ -173,25 +186,80 @@ opcode![
         (0xBC, 3, 4, ABSOLUTE_X), // +1 if page crossed
     ],
 
+    STA |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Memory};
+
+        let addr = cpu.get_operand_addr(mode);
+        cpu.mem_write(addr, cpu.register_a);
+    }, [
+        (0x85, 2, 3, ZERO_PAGE),
+        (0x95, 2, 4, ZERO_PAGE_X),
+        (0x8D, 3, 4, ABSOLUTE),
+        (0x9D, 3, 5, ABSOLUTE_X),
+        (0x99, 3, 5, ABSOLUTE_Y),
+        (0x81, 2, 6, INDIRECT_X),
+        (0x91, 2, 6, INDIRECT_Y),
+    ],
+
+    STX |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Memory};
+
+        let addr = cpu.get_operand_addr(mode);
+        cpu.mem_write(addr, cpu.register_x);
+    }, [
+        (0x86, 2, 3, ZERO_PAGE),
+        (0x96, 2, 4, ZERO_PAGE_X),
+        (0x8E, 3, 4, ABSOLUTE),
+    ],
+
+    STY |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Memory};
+
+        let addr = cpu.get_operand_addr(mode);
+        cpu.mem_write(addr, cpu.register_y);
+    }, [
+        (0x84, 2, 3, ZERO_PAGE),
+        (0x94, 2, 4, ZERO_PAGE_X),
+        (0x8C, 3, 4, ABSOLUTE),
+    ],
+
     /* Flags clear */
     // https://www.nesdev.org/obelisk-6502-guide/reference.html#TAX
     TAX_0AA |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
         cpu.register_x = cpu.register_a;
     
-        cpu.update_flag(crate::cpu::Flag::Zero);
-        cpu.update_flag(crate::cpu::Flag::Negative);
+        cpu.update_flag(crate::cpu::Flag::Zero, cpu.register_x);
+        cpu.update_flag(crate::cpu::Flag::Negative, cpu.register_x);
     }, [
         (0xAA, 1, 2, NONE_ADDRESSING),
+    ],
+
+    TAY |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        cpu.register_y = cpu.register_a;
+    
+        cpu.update_flag(crate::cpu::Flag::Zero, cpu.register_y);
+        cpu.update_flag(crate::cpu::Flag::Negative, cpu.register_y);
+    }, [
+        (0xA8, 1, 2, NONE_ADDRESSING),
     ],
 
     // https://www.nesdev.org/obelisk-6502-guide/reference.html#INX
     INX_0xE8 |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
         cpu.register_x = cpu.register_x.wrapping_add(1);
 
-        cpu.update_flag(crate::cpu::Flag::Zero);
-        cpu.update_flag(crate::cpu::Flag::Negative);
+        cpu.update_flag(crate::cpu::Flag::Zero, cpu.register_x);
+        cpu.update_flag(crate::cpu::Flag::Negative, cpu.register_x);
     }, [
-        (0xe8, 1, 2, NONE_ADDRESSING),
+        (0xE8, 1, 2, NONE_ADDRESSING),
+    ],
+
+    INY |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        cpu.register_y = cpu.register_y.wrapping_add(1);
+
+        cpu.update_flag(crate::cpu::Flag::Zero, cpu.register_y);
+        cpu.update_flag(crate::cpu::Flag::Negative, cpu.register_y);
+    }, [
+        (0xE8, 1, 2, NONE_ADDRESSING),
     ]
 
     /* Stack */
