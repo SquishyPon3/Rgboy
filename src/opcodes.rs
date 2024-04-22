@@ -411,9 +411,42 @@ opcode![
         cpu.status.remove(crate::cpu::Flag::Overflow);  
     }, [
         (0x38, 1, 2, NONE_ADDRESSING),
-    ]
+    ],
 
     /* Stack */
+    PHA |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        cpu.stack_push(cpu.register_a);
+    }, [
+        (0x48, 1, 3, NONE_ADDRESSING),
+    ],
+
+    PLA |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        cpu.register_a = cpu.stack_pull();
+    }, [
+        (0x68, 1, 4, NONE_ADDRESSING),
+    ],
+
+    PHP |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        //http://wiki.nesdev.com/w/index.php/CPU_status_flag_behavior
+        use crate::cpu::Flag;
+        
+        let mut flags = cpu.status.clone();
+        flags.insert(Flag::BreakCommand);
+        flags.insert(Flag::BreakCommand2);
+        cpu.stack_push(flags.bits());
+    }, [
+        (0x08, 1, 3, NONE_ADDRESSING),
+    ],
+
+    PLP |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::Flag;
+
+        cpu.status = Flag::from_bits_truncate(cpu.stack_pull());
+        cpu.status.remove(Flag::BreakCommand);
+        cpu.status.remove(Flag::BreakCommand2);
+    }, [
+        (0x28, 1, 4, NONE_ADDRESSING),
+    ]
 ];
 
 pub mod JSR_0x20 {

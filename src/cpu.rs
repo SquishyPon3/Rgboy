@@ -87,6 +87,34 @@ impl CPU {
         }
     }
 
+    pub fn stack_pull(&mut self) -> u8 {
+        self.stack_pointer = self.stack_pointer.wrapping_add(1);
+        return self.mem_read(
+            STACK as u16 + self.stack_pointer as u16)
+    }
+
+    pub fn stack_pull_u16(&mut self) -> u16 {
+        let lo = self.stack_pull() as u16;
+        let hi = self.stack_pull() as u16;
+
+        return hi << 8 | lo
+    }
+
+    pub fn stack_push(&mut self, data: u8) {
+        self.mem_write(
+            STACK as u16 + self.stack_pointer as u16,
+            data);
+        self.stack_pointer = self.stack_pointer.wrapping_sub(1);
+    }
+
+    pub fn stack_push_u16(&mut self, data: u16) {
+        let hi = (data >> 8) as u8;
+        let lo = (data & u8::MAX as u16) as u8;
+
+        self.stack_push(hi);
+        self.stack_push(lo);
+    }
+
     pub fn register_a_add(&mut self, data: u8) {
         let sum = self.register_a as u16 
             + data as u16
