@@ -52,6 +52,7 @@ macro_rules! opcode {
 // }
 
 opcode![
+    // Special case
     BRK |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
         return;
     }, [
@@ -166,6 +167,104 @@ opcode![
         (0x56, 2, 6, ZERO_PAGE_X),
         (0x4E, 3, 6, ABSOLUTE),
         (0x5E, 3, 7, ABSOLUTE_X),
+    ],
+
+    /* Branching */
+    // +1 cycle length if branch succeeds +2 if a new page
+
+    // Branch if carry clear
+    JMP |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Flag};
+        use super::AddressingMode;
+
+        cpu.jump(mode);
+    }, [
+        (0x4C, 3, 3, ABSOLUTE),
+        (0x6C, 3, 5, NONE_ADDRESSING), // Indirect
+    ],
+
+    // Branch if carry clear
+    BCC |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Flag};
+
+        cpu.branch(false == cpu.status.contains(Flag::Carry))
+    }, [
+        (0x90, 2, 2, NONE_ADDRESSING),
+    ],
+
+    // Branch if carry set
+    BCS |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Flag};
+
+        cpu.branch(cpu.status.contains(Flag::Carry))
+    }, [
+        (0xB0, 2, 2, NONE_ADDRESSING),
+    ],
+
+    // Branch if equal
+    BEQ |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Flag};
+
+        cpu.branch(cpu.status.contains(Flag::Zero))
+    }, [
+        (0xF0, 2, 2, NONE_ADDRESSING),
+    ],
+
+    // BIT - Bit Test (not added yet)
+    // C	Carry Flag	Not affected
+    // Z	Zero Flag	Set if the result if the AND is zero
+    // I	Interrupt Disable	Not affected
+    // D	Decimal Mode Flag	Not affected
+    // B	Break Command	Not affected
+    // V	Overflow Flag	Set to bit 6 of the memory value
+    // N	Negative Flag	Set to bit 7 of the memory value
+    // Opcode Bytes Cycles Addressing Mode	
+    // $24 2 3 Zero Page	
+    // $2C 3 4 Absolute	
+
+    // Branch if minus
+    BMI |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Flag};
+
+        cpu.branch(cpu.status.contains(Flag::Negative))
+    }, [
+        (0x30, 2, 2, NONE_ADDRESSING), 
+    ],
+
+    // Branch if not equal
+    BNE |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Flag};
+
+        cpu.branch(false == cpu.status.contains(Flag::Zero))
+    }, [
+        (0xD0, 2, 2, NONE_ADDRESSING),
+    ],
+
+    // Branch if positive
+    BPL |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Flag};
+
+        cpu.branch(false == cpu.status.contains(Flag::Negative))
+    }, [
+        (0x10, 2, 2, NONE_ADDRESSING),
+    ],
+
+    // Branch if overflow clear
+    BVC |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Flag};
+
+        cpu.branch(false == cpu.status.contains(Flag::Overflow))
+    }, [
+        (0x50, 2, 2, NONE_ADDRESSING),
+    ],
+
+    // Branch if overflow set
+    BVS |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Flag};
+
+        cpu.branch(cpu.status.contains(Flag::Overflow))
+    }, [
+        (0x70, 2, 2, NONE_ADDRESSING),
     ],
 
     /* Stores & Loads */

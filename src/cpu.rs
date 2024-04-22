@@ -242,6 +242,53 @@ impl CPU {
         return data;
     }
 
+    pub fn branch(&mut self, case: bool) {
+        if case {
+            let jump: i8 = self.mem_read(self.counter) as i8;
+            let addr = self
+                .counter
+                .wrapping_add(1)
+                .wrapping_add(jump as u16);
+
+            self.counter = addr;
+        }
+    }
+
+    pub fn jump(&mut self, mode: AddressingMode) {
+
+        let addr = self.mem_read_u16(self.counter);
+        
+        match mode {
+
+            AddressingMode::ABSOLUTE => {
+                self.counter = addr;
+            }
+            AddressingMode::NONE_ADDRESSING => {
+                self.counter = addr;
+
+                // let indirect_ref = self.mem_read_u16(mem_address);
+                // 6502 bug mode with with page boundary:
+                // if address $3000 contains $40, $30FF contains $80, 
+                // and $3100 contains $50, the result of JMP ($30FF) 
+                // will be a transfer of control to $4080 rather than
+                // $5080 as you intended i.e. the 6502 took the low byte 
+                // of the address from $30FF and the high byte from $3000
+
+                let indirect_ref = match addr & 0x00FF {
+                    0x00FF => {
+                        let lo = self.mem_read(addr);
+                        let hi = self.mem_read(addr & 0xFF00);
+                        (hi as u16) << 8 | (lo as u16)
+                    }
+                    _ => self.mem_read_u16(addr)
+                };
+
+                self.counter = indirect_ref;
+            }
+            _ => panic!("JUMP PROVIDED INCORRECT ADDRESSING MODE")
+        }
+    }
+
     pub fn load(&mut self, program: Vec<u8>) {
         // load method should load a program into PRG ROM space and save the reference to the code into 0xFFFC memory cell
         self.memory[PGRM_ROM_START as usize .. (PGRM_ROM_START as usize + program.len())].copy_from_slice(&program[..]);
