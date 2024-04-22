@@ -420,12 +420,6 @@ opcode![
         (0x48, 1, 3, NONE_ADDRESSING),
     ],
 
-    PLA |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
-        cpu.register_a = cpu.stack_pull();
-    }, [
-        (0x68, 1, 4, NONE_ADDRESSING),
-    ],
-
     PHP |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
         //http://wiki.nesdev.com/w/index.php/CPU_status_flag_behavior
         use crate::cpu::Flag;
@@ -436,6 +430,12 @@ opcode![
         cpu.stack_push(flags.bits());
     }, [
         (0x08, 1, 3, NONE_ADDRESSING),
+    ],
+
+    PLA |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        cpu.register_a = cpu.stack_pull();
+    }, [
+        (0x68, 1, 4, NONE_ADDRESSING),
     ],
 
     PLP |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
