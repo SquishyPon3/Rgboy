@@ -66,6 +66,9 @@ opcode![
     ],
 
     /* Arithmetic */
+
+    // Add with carry
+    // A,Z,C,N = A + M + C
     ADC |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
         use crate::cpu::{CPU, Memory};
 
@@ -84,14 +87,18 @@ opcode![
         (0x71, 2, 5, INDIRECT_Y),
     ],
 
+    // Logical And
+    // A,Z,N = A & M
     AND |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
-        use crate::cpu::Memory;
+        use crate::cpu::{Memory, Flag};
 
         let addr = cpu.get_operand_addr(mode);
-        let val = cpu.mem_read(addr);
+        let data = cpu.mem_read(addr);
 
-        cpu.register_a &= val;
-        todo!("This does not do any evaluation yet, or set any flags...");
+        cpu.register_a &= data;
+
+        cpu.update_flag(Flag::Zero, cpu.register_a);
+        cpu.update_flag(Flag::Negative, cpu.register_a);
     }, [
         (0x29, 2, 2, IMMEDIATE), 
         (0x25, 2, 3, ZERO_PAGE),
@@ -103,6 +110,55 @@ opcode![
         (0x31, 2, 5, INDIRECT_Y),
     ],
 
+    // Exclusive Or
+    // A,Z,N = A^M
+    EOR |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Memory, Flag};
+
+        let addr = cpu.get_operand_addr(mode);
+        let data = cpu.mem_read(addr);
+
+        cpu.register_a ^= data;
+
+        cpu.update_flag(Flag::Zero, cpu.register_a);
+        cpu.update_flag(Flag::Negative, cpu.register_a)
+
+    }, [
+        (0x49, 2, 2, IMMEDIATE), 
+        (0x45, 2, 3, ZERO_PAGE),
+        (0x55, 2, 4, ZERO_PAGE_X),
+        (0x4D, 3, 4, ABSOLUTE),
+        (0x5D, 3, 4, ABSOLUTE_X), // +1 if page crossed
+        (0x59, 3, 4, ABSOLUTE_Y), // +1 if page crossed
+        (0x41, 2, 6, INDIRECT_X),
+        (0x51, 2, 5, INDIRECT_Y), // +1 if page crossed
+    ],
+
+    // Logical Inclusive Or
+    // A,Z,N = A|M
+    ORA |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Memory, Flag};
+
+        let addr = cpu.get_operand_addr(mode);
+        let data = cpu.mem_read(addr);
+
+        cpu.register_a |= data;
+
+        cpu.update_flag(Flag::Zero, cpu.register_a);
+        cpu.update_flag(Flag::Negative, cpu.register_a)
+
+    }, [
+        (0x09, 2, 2, IMMEDIATE), 
+        (0x05, 2, 3, ZERO_PAGE),
+        (0x15, 2, 4, ZERO_PAGE_X),
+        (0x0D, 3, 4, ABSOLUTE),
+        (0x1D, 3, 4, ABSOLUTE_X), // +1 if page crossed
+        (0x19, 3, 4, ABSOLUTE_Y), // +1 if page crossed
+        (0x01, 2, 6, INDIRECT_X),
+        (0x22, 2, 5, INDIRECT_Y), // +1 if page crossed
+    ],
+
+    // Decrement memory
     DEC |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
         cpu.decrement_memory(mode);
     }, [
@@ -113,8 +169,137 @@ opcode![
     ],
 
     /* Shifts */
-    CMP |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+    // Arithmatic shift left
+    // A,Z,C,N = M * 2 
+    // or 
+    // M,Z,C,N = M * 2
+    ASL |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
         use crate::cpu::{Memory, Flag};
+        use crate::opcodes::AddressingMode;
+        
+        let mut data;
+
+        match mode {
+            AddressingMode::NONE_ADDRESSING => {
+                data = cpu.register_a;
+
+                // If a bit is left over set Carry flag
+                match data >> 7 {
+                    1 => cpu.status.insert(Flag::Carry),
+                    _ => cpu.status.remove(Flag::Carry)
+                }
+        
+                data <<= 1;
+            }
+            _ => {
+                let addr = cpu.get_operand_addr(mode);
+                data = cpu.mem_read(addr);
+        
+                // If a bit is left over set Carry flag
+                match data >> 7 {
+                    1 => cpu.status.insert(Flag::Carry),
+                    _ => cpu.status.remove(Flag::Carry)
+                }
+        
+                data <<= 1;
+                cpu.mem_write(addr, data);
+            }
+        };
+
+        cpu.update_flag(Flag::Zero, data);
+        cpu.update_flag(Flag::Negative, data)
+
+    }, [
+        (0x0A, 1, 2, NONE_ADDRESSING), // Accumulator
+        (0x06, 2, 5, ZERO_PAGE),
+        (0x16, 2, 6, ZERO_PAGE_X),
+        (0x0E, 3, 6, ABSOLUTE),
+        (0x1E, 3, 7, ABSOLUTE_X),
+    ],
+    
+    // Rotate Left
+    ROL |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::opcodes::AddressingMode;
+
+        if matches!(mode, AddressingMode::NONE_ADDRESSING) {
+            cpu.rotate_left_a();
+            return;
+        }
+        
+        _ = cpu.rotate_left(mode);
+
+    }, [
+        (0x0A, 1, 2, NONE_ADDRESSING), // Accumulator
+        (0x06, 2, 5, ZERO_PAGE),
+        (0x16, 2, 6, ZERO_PAGE_X),
+        (0x0E, 3, 6, ABSOLUTE),
+        (0x1E, 3, 7, ABSOLUTE_X),
+    ],
+
+    ROR |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::opcodes::AddressingMode;
+
+        if matches!(mode, AddressingMode::NONE_ADDRESSING) {
+            cpu.rotate_right_a();
+            return;
+        }
+        
+        _ = cpu.rotate_right(mode);
+
+    }, [
+        (0x6A, 1, 2, NONE_ADDRESSING), // Accumulator
+        (0x66, 2, 5, ZERO_PAGE),
+        (0x76, 2, 6, ZERO_PAGE_X),
+        (0x6E, 3, 6, ABSOLUTE),
+        (0x7E, 3, 7, ABSOLUTE_X),
+    ],
+
+    // Decrement Memory
+    DEM |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Flag, Memory};
+        
+        let addr = cpu.get_operand_addr(mode);
+        let mut data = cpu.mem_read(addr);
+        
+        data = data.wrapping_sub(1);
+
+        cpu.mem_write(addr, data);
+        cpu.update_flag(Flag::Zero, data);
+        cpu.update_flag(Flag::Negative, data);
+
+    }, [
+        (0xC6, 2, 5, ZERO_PAGE),
+        (0xD6, 2, 6, ZERO_PAGE_X),
+        (0xCE, 3, 6, ABSOLUTE),
+        (0xDE, 3, 7, ABSOLUTE_X),
+    ],
+
+    // Decrement X Register
+    // X,Z,N = X - 1
+    DEX |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Flag};
+        
+        cpu.register_x = cpu.register_x.wrapping_sub(1);
+        cpu.update_flag(Flag::Zero, cpu.register_x);
+        cpu.update_flag(Flag::Negative, cpu.register_x);
+    }, [
+        (0xCA, 1, 2, NONE_ADDRESSING),
+    ],
+
+    // Decrement Y Register
+    // Y,Z,N = Y - 1
+    DEY |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Flag};
+        
+        cpu.register_y = cpu.register_y.wrapping_sub(1);
+        cpu.update_flag(Flag::Zero, cpu.register_y);
+        cpu.update_flag(Flag::Negative, cpu.register_y);
+    }, [
+        (0x88, 1, 2, NONE_ADDRESSING),
+    ],
+
+    CMP |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+
         cpu.compare(mode, cpu.register_a);
     }, [
         (0xC9, 2, 2, IMMEDIATE),
@@ -128,7 +313,6 @@ opcode![
     ],
 
     CPX |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
-        use crate::cpu::{Memory, Flag};
 
         cpu.compare(mode, cpu.register_x);
     }, [
@@ -138,7 +322,6 @@ opcode![
     ],
 
     CPY |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
-        use crate::cpu::{Memory, Flag};
 
         cpu.compare(mode, cpu.register_y)
     }, [
@@ -172,15 +355,46 @@ opcode![
     /* Branching */
     // +1 cycle length if branch succeeds +2 if a new page
 
-    // Branch if carry clear
+    // Jump
     JMP |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
-        use crate::cpu::{Flag};
         use super::AddressingMode;
 
         cpu.jump(mode);
     }, [
         (0x4C, 3, 3, ABSOLUTE),
         (0x6C, 3, 5, NONE_ADDRESSING), // Indirect
+    ],
+
+    // Return from Subroutine
+    RTS |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+
+        cpu.counter = cpu.stack_pull_u16() + 1;
+    }, [
+        (0x60, 1, 6, NONE_ADDRESSING), // Implied
+    ],
+
+    RTI |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Flag};
+
+        cpu.status = Flag::from_bits_truncate(cpu.stack_pull());
+        cpu.status.remove(Flag::BreakCommand);
+        cpu.status.remove(Flag::BreakCommand2);
+
+        cpu.counter = cpu.stack_pull_u16();
+    }, [
+        (0x40, 1, 6, NONE_ADDRESSING), // Implied
+    ],
+
+    // Jump to Subroutine
+    JSR |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Memory};
+
+        cpu.stack_push_u16(cpu.counter + 2 - 1);
+        let target_addr = cpu.mem_read_u16(cpu.counter);
+        cpu.counter = target_addr;
+
+    }, [
+        (0x20, 3, 6, ABSOLUTE),
     ],
 
     // Branch if carry clear
@@ -222,7 +436,7 @@ opcode![
     // $24 2 3 Zero Page	
     // $2C 3 4 Absolute	
 
-    // Branch if minus
+    // Branch if minus (Negative)
     BMI |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
         use crate::cpu::{Flag};
 
@@ -265,6 +479,28 @@ opcode![
         cpu.branch(cpu.status.contains(Flag::Overflow))
     }, [
         (0x70, 2, 2, NONE_ADDRESSING),
+    ],
+
+    // A & M, N = M7, V = M6
+    BIT |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Flag, Memory};
+
+        let addr = cpu.get_operand_addr(mode);
+        let data = cpu.mem_read(addr);
+
+        let flags = cpu.register_a & data;
+        
+        match flags {
+            0 => cpu.status.insert(Flag::Zero),
+            _ => cpu.status.remove(Flag::Zero)
+        }
+
+        // Bits 7 and 6 of data value is copied into Negative & Overflow flags
+        cpu.status.set(Flag::Negative, data & 0b1000_0000 > 0);
+        cpu.status.set(Flag::Overflow, data & 0b0100_0000 > 0);
+    }, [
+        (0x24, 2, 3, ZERO_PAGE),
+        (0x2C, 3, 4, ABSOLUTE),
     ],
 
     /* Stores & Loads */
@@ -345,8 +581,40 @@ opcode![
     ],
 
     /* Flags clear */
+
+    // Clear Decimal Mode flag     
+    // D = 0
+    CLD |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        cpu.status.remove(crate::cpu::Flag::DecimalMode);
+    }, [
+        (0xD8, 1, 2, NONE_ADDRESSING),
+    ],
+
+    // Clear Interrupt Disable flag
+    // I = 0
+    CLI |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        cpu.status.remove(crate::cpu::Flag::InterruptDisable);
+    }, [
+        (0x58, 1, 2, NONE_ADDRESSING),
+    ],
+
+    // Clear Overflow Flag
+    // V = 0 
+    CLV |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        cpu.status.remove(crate::cpu::Flag::Overflow);
+    }, [
+        (0xB8, 1, 2, NONE_ADDRESSING),
+    ],
+
+    // Clear Carry flag
+    CLC |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        cpu.status.remove(crate::cpu::Flag::Carry);  
+    }, [
+        (0x18, 1, 2, NONE_ADDRESSING),
+    ],
+
     // https://www.nesdev.org/obelisk-6502-guide/reference.html#TAX
-    TAX_0AA |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+    TAX |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
         cpu.register_x = cpu.register_a;
     
         cpu.update_flag(crate::cpu::Flag::Zero, cpu.register_x);
@@ -365,7 +633,7 @@ opcode![
     ],
 
     // https://www.nesdev.org/obelisk-6502-guide/reference.html#INX
-    INX_0xE8 |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+    INX |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
         cpu.register_x = cpu.register_x.wrapping_add(1);
 
         cpu.update_flag(crate::cpu::Flag::Zero, cpu.register_x);
@@ -382,35 +650,81 @@ opcode![
     }, [
         (0xE8, 1, 2, NONE_ADDRESSING),
     ],
-
-    CLD |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
-        cpu.status.remove(crate::cpu::Flag::DecimalMode);  
-    }, [
-        (0xD8, 1, 2, NONE_ADDRESSING),
-    ],
-
-    CLI |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
-        cpu.status.remove(crate::cpu::Flag::InterruptDisable);  
-    }, [
-        (0x58, 1, 2, NONE_ADDRESSING),
-    ],
-
-    CLV |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
-        cpu.status.remove(crate::cpu::Flag::Overflow);  
-    }, [
-        (0xB8, 1, 2, NONE_ADDRESSING),
-    ],
-
-    CLC |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
-        cpu.status.remove(crate::cpu::Flag::Carry);  
-    }, [
-        (0x18, 1, 2, NONE_ADDRESSING),
-    ],
-
+    
+    // Set Carry Flag
+    // C = 1
     SEC |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
-        cpu.status.remove(crate::cpu::Flag::Overflow);  
+        cpu.status.insert(crate::cpu::Flag::Carry);  
     }, [
         (0x38, 1, 2, NONE_ADDRESSING),
+    ],
+
+    // Set Interrupt Disable Flag
+    // I = 1
+    SEI |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        cpu.status.insert(crate::cpu::Flag::InterruptDisable);  
+    }, [
+        (0x78, 1, 2, NONE_ADDRESSING),
+    ],
+    
+    // Set Decimal Flag (UNUSED)
+    // D = 1
+    SED |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        cpu.status.insert(crate::cpu::Flag::DecimalMode);  
+    }, [
+        (0xF8, 1, 2, NONE_ADDRESSING),
+    ],
+
+    // Transfer stack pointer to X
+    // X = S
+    TSX |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Flag};
+
+        cpu.register_x = cpu.stack_pointer;
+
+        cpu.update_flag(Flag::Zero, cpu.register_x);
+        cpu.update_flag(Flag::Negative, cpu.register_x);
+
+    }, [
+        (0xBA, 1, 2, NONE_ADDRESSING), // Implied
+    ],
+
+    // Transfer X to accumulator
+    // A = X
+    TXA |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Flag};
+
+        cpu.register_a = cpu.register_x;
+        
+        cpu.update_flag(Flag::Zero, cpu.register_a);
+        cpu.update_flag(Flag::Negative, cpu.register_a);
+
+    }, [
+        (0x8A, 1, 2, NONE_ADDRESSING), // Implied
+    ],
+
+    // Transfer X to stack pointer
+    // S = X
+    TXS |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+
+        cpu.stack_pointer = cpu.register_x;
+
+    }, [
+        (0x9A, 1, 2, NONE_ADDRESSING), // Implied
+    ],
+
+    // Transfer Y to accumulator
+    // A = Y
+    TYA |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{Flag};
+
+        cpu.register_a = cpu.register_y;
+        
+        cpu.update_flag(Flag::Zero, cpu.register_a);
+        cpu.update_flag(Flag::Negative, cpu.register_a);
+
+    }, [
+        (0x98, 1, 2, NONE_ADDRESSING), // Implied
     ],
 
     /* Stack */
@@ -448,39 +762,6 @@ opcode![
         (0x28, 1, 4, NONE_ADDRESSING),
     ]
 ];
-
-pub mod JSR_0x20 {
-    use crate::cpu::{CPU, Flag};
-    use super::AddressingMode::ABSOLUTE;
-    
-    pub const VALUE: u8 = 0x20;
-    pub const LEN: u8 = 3;
-    pub const CYCLES: u8 = 6;
-    pub const ADD_PAGE_CROSSED: bool = false;
-    pub const ADD_NEW_PAGE: bool = false;
-
-    pub fn execute(cpu: &mut CPU) {
-
-        // let addr = cpu.get_operand_addr(ABSOLUTE);
-        // let val = cpu.mem_read(addr);
-
-        // cpu.counter = addr;
-    }
-}
-
-pub mod RTS_0x60 {
-    use crate::cpu::{CPU, Flag};
-
-    pub const VALUE: u8 = 0x60;
-    pub const LEN: u8 = 1;
-    pub const CYCLES: u8 = 6;
-    pub const ADD_PAGE_CROSSED: bool = false;
-    pub const ADD_NEW_PAGE: bool = false;
-
-    pub fn execute(cpu: &mut CPU) {
-        return;        
-    }
-}
 
 #[derive(Debug)]
 #[allow(non_camel_case_types, unused)]

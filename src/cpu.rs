@@ -208,6 +208,92 @@ impl CPU {
         return data;
     }
 
+    pub fn rotate_left_a(&mut self) {
+        let mut data = self.register_a;
+        let had_carry = self.status.contains(Flag::Carry);
+
+        match data >> 7 {
+            1 => self.status.insert(Flag::Carry),
+            _ => self.status.remove(Flag::Carry)
+        }
+
+        data <<= 1;
+
+        if had_carry {
+            data = data | 0b1000_0000;
+        }
+
+        self.register_a = data;
+        self.update_flag(Flag::Zero, data);
+        self.update_flag(Flag::Negative, data);
+    }
+
+    pub fn rotate_left(&mut self, mode: AddressingMode) -> u8 {
+        let addr = self.get_operand_addr(mode);
+        let mut data = self.mem_read(addr);
+        let had_carry = self.status.contains(Flag::Carry);
+
+        match data >> 7 {
+            1 => self.status.insert(Flag::Carry),
+            _ => self.status.remove(Flag::Carry)
+        }
+
+        data <<= 1;
+
+        if had_carry {
+            data = data | 0b1000_0000;
+        }
+
+        self.mem_write(addr, data);
+        self.update_flag(Flag::Zero, data);
+        self.update_flag(Flag::Negative, data);
+
+        return data;
+    }
+
+    pub fn rotate_right_a(&mut self) {
+        let mut data = self.register_a;
+        let had_carry = self.status.contains(Flag::Carry);
+
+        match data << 7 {
+            1 => self.status.insert(Flag::Carry),
+            _ => self.status.remove(Flag::Carry)
+        }
+
+        data >>= 1;
+
+        if had_carry {
+            data = data | 0b1000_0000;
+        }
+
+        self.register_a = data;
+        self.update_flag(Flag::Zero, data);
+        self.update_flag(Flag::Negative, data);
+    }
+
+    pub fn rotate_right(&mut self, mode: AddressingMode) -> u8 {
+        let addr = self.get_operand_addr(mode);
+        let mut data = self.mem_read(addr);
+        let had_carry = self.status.contains(Flag::Carry);
+
+        match data << 7 {
+            1 => self.status.insert(Flag::Carry),
+            _ => self.status.remove(Flag::Carry)
+        }
+
+        data >>= 1;
+
+        if had_carry {
+            data = data | 0b1000_0000;
+        }
+
+        self.mem_write(addr, data);
+        self.update_flag(Flag::Zero, data);
+        self.update_flag(Flag::Negative, data);
+
+        return data;
+    }
+
     pub fn load_into(&mut self, mode: AddressingMode, register: Register) {
         let addr = self.get_operand_addr(mode);
         let val = self.mem_read(addr);
@@ -425,9 +511,9 @@ impl CPU {
                     LDA::ZERO_PAGE,
                     LDA::ZERO_PAGE_X,
 
-                    TAX_0AA::NONE_ADDRESSING,
+                    TAX::NONE_ADDRESSING,
 
-                    INX_0xE8::NONE_ADDRESSING,
+                    INX::NONE_ADDRESSING,
                 }
             );
 

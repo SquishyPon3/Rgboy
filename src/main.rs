@@ -15,8 +15,6 @@ fn main() {
     // Gamepad.listen()
     // APU.update()
 
-    
-
     println!("Hello, world!");
 }
 
@@ -24,7 +22,7 @@ fn main() {
 mod test {
     use std::ops::BitAnd;
 
-    use crate::{cpu::Flag, opcodes::{INX_0xE8, BRK, CPY, LDA, TAX_0AA}};
+    use crate::{cpu::Flag, opcodes::{INX, BRK, CPY, LDA, TAX}};
 
     use super::*;
  
@@ -67,7 +65,7 @@ fn test_0xa9_lda_zero_flag() {
 fn test_0xaa_tax_move_a_to_x() {
         let mut cpu: CPU = CPU::new();
         let program = vec![
-            TAX_0AA::NONE_ADDRESSING::VALUE, 
+            TAX::NONE_ADDRESSING::VALUE, 
             BRK::NONE_ADDRESSING::VALUE
         ];
         
@@ -86,8 +84,8 @@ fn test_5_ops_working_together() {
         let program = vec![
             LDA::IMMEDIATE::VALUE, 
             CPY::IMMEDIATE::VALUE,
-            TAX_0AA::NONE_ADDRESSING::VALUE, 
-            INX_0xE8::NONE_ADDRESSING::VALUE, 
+            TAX::NONE_ADDRESSING::VALUE, 
+            INX::NONE_ADDRESSING::VALUE, 
             BRK::NONE_ADDRESSING::VALUE
         ];
 
@@ -100,8 +98,8 @@ fn test_5_ops_working_together() {
 fn test_int_overflow() {
     let mut cpu: CPU = CPU::new();
     let program = vec![
-        INX_0xE8::NONE_ADDRESSING::VALUE, 
-        INX_0xE8::NONE_ADDRESSING::VALUE, 
+        INX::NONE_ADDRESSING::VALUE, 
+        INX::NONE_ADDRESSING::VALUE, 
         BRK::NONE_ADDRESSING::VALUE
     ];
 
@@ -111,5 +109,53 @@ fn test_int_overflow() {
     cpu.run();
 
     assert_eq!(cpu.register_x, 1)
+}
+
+#[test]
+fn test_match_bit_and() {
+
+    let a = 32 & 1;
+    let b = 16 & 3;
+    let c = 183 & 32;
+
+    let a_match = match a {
+        1 => true,
+        _ => false
+    };
+
+    let mut a_if;
+    if a == 1 {
+        a_if = true;
+    } else {
+        a_if = false;
+    }
+
+    let b_match = match b {
+        1 => true,
+        _ => false
+    };
+
+    let mut b_if;
+    if b == 1 {
+        b_if = true;
+    } else {
+        b_if = false;
+    }
+
+    let c_match = match c {
+        1 => true,
+        _ => false
+    };
+
+    let mut c_if;
+    if c == 1 {
+        c_if = true;
+    } else {
+        c_if = false;
+    }
+
+    assert_eq!(a_match, a_if);
+    assert_eq!(b_match, b_if);
+    assert_eq!(c_match, c_if);
 }
 }
