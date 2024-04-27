@@ -424,18 +424,6 @@ opcode![
         (0xF0, 2, 2, NONE_ADDRESSING),
     ],
 
-    // BIT - Bit Test (not added yet)
-    // C	Carry Flag	Not affected
-    // Z	Zero Flag	Set if the result if the AND is zero
-    // I	Interrupt Disable	Not affected
-    // D	Decimal Mode Flag	Not affected
-    // B	Break Command	Not affected
-    // V	Overflow Flag	Set to bit 6 of the memory value
-    // N	Negative Flag	Set to bit 7 of the memory value
-    // Opcode Bytes Cycles Addressing Mode	
-    // $24 2 3 Zero Page	
-    // $2C 3 4 Absolute	
-
     // Branch if minus (Negative)
     BMI |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
         use crate::cpu::{Flag};
