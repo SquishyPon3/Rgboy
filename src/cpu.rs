@@ -699,7 +699,6 @@ impl CPU {
     pub fn update_flag(&mut self, flag: Flag, register: u8) {
         
         match flag {
-            Flag::Carry => todo!(),
             Flag::Zero => {
                 if register == 0 {
                     self.status.insert(Flag::Zero);                       
@@ -708,11 +707,6 @@ impl CPU {
                     self.status.remove(Flag::Zero);
                 }
             },
-            Flag::InterruptDisable => todo!(),
-            Flag::DecimalMode => todo!(),
-            Flag::BreakCommand => todo!(),
-            Flag::BreakCommand2 => todo!(),
-            Flag::Overflow => todo!(),
             Flag::Negative => {
                 if register >> 1 == 1 {
                     self.status.insert(Flag::Negative);
