@@ -487,33 +487,208 @@ impl CPU {
 
             execute!(self, byte_code, 
                 {
+                    /* Special */
                     BRK::NONE_ADDRESSING,
 
                     NOP::NONE_ADDRESSING,
 
+                    /* Arithmetic */
                     ADC::IMMEDIATE, 
                     ADC::ZERO_PAGE, 
                     ADC::ZERO_PAGE_X, 
                     ADC::ABSOLUTE, 
                     ADC::ABSOLUTE_X, 
                     ADC::ABSOLUTE_Y,
+                    
+                    AND::IMMEDIATE, 
+                    AND::ZERO_PAGE, 
+                    AND::ZERO_PAGE_X, 
+                    AND::ABSOLUTE, 
+                    AND::ABSOLUTE_X, 
+                    AND::ABSOLUTE_Y,
+                    AND::INDIRECT_X, 
+                    AND::INDIRECT_Y,
 
-                    CPY::ABSOLUTE,
+                    EOR::IMMEDIATE, 
+                    EOR::ZERO_PAGE, 
+                    EOR::ZERO_PAGE_X, 
+                    EOR::ABSOLUTE, 
+                    EOR::ABSOLUTE_X, 
+                    EOR::ABSOLUTE_Y,
+                    EOR::INDIRECT_X, 
+                    EOR::INDIRECT_Y,
+
+                    ORA::IMMEDIATE, 
+                    ORA::ZERO_PAGE, 
+                    ORA::ZERO_PAGE_X, 
+                    ORA::ABSOLUTE, 
+                    ORA::ABSOLUTE_X, 
+                    ORA::ABSOLUTE_Y,
+                    ORA::INDIRECT_X, 
+                    ORA::INDIRECT_Y,
+
+                    DEC::ZERO_PAGE, 
+                    DEC::ZERO_PAGE_X, 
+                    DEC::ABSOLUTE, 
+                    DEC::ABSOLUTE_X, 
+
+                    /* Shifts */
+                    ASL::NONE_ADDRESSING, // Accumulator
+                    ASL::ZERO_PAGE, 
+                    ASL::ZERO_PAGE_X, 
+                    ASL::ABSOLUTE, 
+                    ASL::ABSOLUTE_X, 
+
+                    ROL::NONE_ADDRESSING, // Accumulator
+                    ROL::ZERO_PAGE, 
+                    ROL::ZERO_PAGE_X, 
+                    ROL::ABSOLUTE, 
+                    ROL::ABSOLUTE_X, 
+
+                    ROR::NONE_ADDRESSING, // Accumulator
+                    ROR::ZERO_PAGE, 
+                    ROR::ZERO_PAGE_X, 
+                    ROR::ABSOLUTE, 
+                    ROR::ABSOLUTE_X, 
+
+                    DEM::ZERO_PAGE, 
+                    DEM::ZERO_PAGE_X, 
+                    DEM::ABSOLUTE, 
+                    DEM::ABSOLUTE_X, 
+
+                    DEX::NONE_ADDRESSING,
+                    
+                    DEY::NONE_ADDRESSING,
+
+                    CMP::IMMEDIATE, 
+                    CMP::ZERO_PAGE, 
+                    CMP::ZERO_PAGE_X, 
+                    CMP::ABSOLUTE, 
+                    CMP::ABSOLUTE_X, 
+                    CMP::ABSOLUTE_Y,
+                    CMP::INDIRECT_X, 
+                    CMP::INDIRECT_Y,
+
+                    CPX::IMMEDIATE, 
+                    CPX::ZERO_PAGE, 
+                    CPX::ABSOLUTE, 
+                    
                     CPY::IMMEDIATE,
                     CPY::ZERO_PAGE,
+                    CPY::ABSOLUTE,
 
+                    LSR::NONE_ADDRESSING, // Accumulator 
+                    LSR::ZERO_PAGE, 
+                    LSR::ZERO_PAGE_X, 
+                    LSR::ABSOLUTE, 
+                    LSR::ABSOLUTE_X, 
+
+                    /* Branching */
+                    JMP::ABSOLUTE,
+                    JMP::NONE_ADDRESSING,
+
+                    RTS::NONE_ADDRESSING,
+
+                    RTI::NONE_ADDRESSING,
+
+                    JSR::ABSOLUTE,
+
+                    BCC::NONE_ADDRESSING,
+
+                    BCS::NONE_ADDRESSING,
+
+                    BEQ::NONE_ADDRESSING,
+
+                    BMI::NONE_ADDRESSING,
+
+                    BNE::NONE_ADDRESSING,
+
+                    BPL::NONE_ADDRESSING,
+
+                    BVC::NONE_ADDRESSING,
+
+                    BVS::NONE_ADDRESSING,
+
+                    BIT::ZERO_PAGE,
+                    BIT::ABSOLUTE,
+
+                    /* Stores & Loads */
+                    LDA::IMMEDIATE,
+                    LDA::ZERO_PAGE,
+                    LDA::ZERO_PAGE_X,
                     LDA::ABSOLUTE,
                     LDA::ABSOLUTE_X,
                     LDA::ABSOLUTE_Y,
-                    LDA::IMMEDIATE,
                     LDA::INDIRECT_X,
                     LDA::INDIRECT_Y,
-                    LDA::ZERO_PAGE,
-                    LDA::ZERO_PAGE_X,
+
+                    LDX::IMMEDIATE,
+                    LDX::ZERO_PAGE,
+                    LDX::ZERO_PAGE_Y,
+                    LDX::ABSOLUTE,
+                    LDX::ABSOLUTE_Y,
+
+                    LDY::IMMEDIATE,
+                    LDY::ZERO_PAGE,
+                    LDY::ZERO_PAGE_X,
+                    LDY::ABSOLUTE,
+                    LDY::ABSOLUTE_X,
+
+                    STA::ZERO_PAGE,
+                    STA::ZERO_PAGE_X,
+                    STA::ABSOLUTE,
+                    STA::ABSOLUTE_X,
+                    STA::ABSOLUTE_Y,
+                    STA::INDIRECT_X,
+                    STA::INDIRECT_Y,
+
+                    STX::ZERO_PAGE,
+                    STX::ZERO_PAGE_X,
+                    STX::ABSOLUTE,
+
+                    STY::ZERO_PAGE,
+                    STY::ZERO_PAGE_X,
+                    STY::ABSOLUTE,
+
+                    /* Flags Clear */
+                    CLD::NONE_ADDRESSING,
+
+                    CLI::NONE_ADDRESSING,
+
+                    CLV::NONE_ADDRESSING,
+
+                    CLC::NONE_ADDRESSING,
 
                     TAX::NONE_ADDRESSING,
 
+                    TAY::NONE_ADDRESSING,
+
                     INX::NONE_ADDRESSING,
+
+                    INY::NONE_ADDRESSING,
+
+                    SEC::NONE_ADDRESSING,
+
+                    SEI::NONE_ADDRESSING,
+
+                    SED::NONE_ADDRESSING,
+
+                    TSX::NONE_ADDRESSING,
+
+                    TXA::NONE_ADDRESSING,
+
+                    TXS::NONE_ADDRESSING,
+
+                    TYA::NONE_ADDRESSING,
+
+                    /* Stack */
+                    PHA::NONE_ADDRESSING,
+
+                    PHP::NONE_ADDRESSING,
+
+                    PLA::NONE_ADDRESSING,
+
+                    PLP::NONE_ADDRESSING,
                 }
             );
 
