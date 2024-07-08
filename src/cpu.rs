@@ -40,7 +40,7 @@ macro_rules! execute {
                     $opcode::$mode::execute($cpu);
                 }
             )*
-            _ => { }
+            _ => { panic!("No opcode for {:#04X?}", $byte_code) }
         }
     }
 }
