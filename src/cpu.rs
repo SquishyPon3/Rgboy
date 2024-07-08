@@ -45,6 +45,30 @@ macro_rules! execute {
     }
 }
 
+const SNAKE_GAME: [u8; 16 * 19 + 5] = [
+    0x20, 0x06, 0x06, 0x20, 0x38, 0x06, 0x20, 0x0d, 0x06, 0x20, 0x2a, 0x06, 0x60, 0xa9, 0x02, 0x85,
+    0x02, 0xa9, 0x04, 0x85, 0x03, 0xa9, 0x11, 0x85, 0x10, 0xa9, 0x10, 0x85, 0x12, 0xa9, 0x0f, 0x85,
+    0x14, 0xa9, 0x04, 0x85, 0x11, 0x85, 0x13, 0x85, 0x15, 0x60, 0xa5, 0xfe, 0x85, 0x00, 0xa5, 0xfe,
+    // Fails here on 0xC3 (Invalid opcode!) [ .. 0x85, 0x85, 0x85, 0x60, 0x20, 0x06, 0x8D] 
+    0x29, 0x03, 0x18, 0x69, 0x02, 0x85, 0x01, 0x60, 0x20, 0x4d, 0x06, 0x20, 0x8d, 0x06, 0x20, 0xc3, 
+    0x06, 0x20, 0x19, 0x07, 0x20, 0x20, 0x07, 0x20, 0x2d, 0x07, 0x4c, 0x38, 0x06, 0xa5, 0xff, 0xc9,
+    0x77, 0xf0, 0x0d, 0xc9, 0x64, 0xf0, 0x14, 0xc9, 0x73, 0xf0, 0x1b, 0xc9, 0x61, 0xf0, 0x22, 0x60,
+    0xa9, 0x04, 0x24, 0x02, 0xd0, 0x26, 0xa9, 0x01, 0x85, 0x02, 0x60, 0xa9, 0x08, 0x24, 0x02, 0xd0,
+    0x1b, 0xa9, 0x02, 0x85, 0x02, 0x60, 0xa9, 0x01, 0x24, 0x02, 0xd0, 0x10, 0xa9, 0x04, 0x85, 0x02,
+    0x60, 0xa9, 0x02, 0x24, 0x02, 0xd0, 0x05, 0xa9, 0x08, 0x85, 0x02, 0x60, 0x60, 0x20, 0x94, 0x06,
+    0x20, 0xa8, 0x06, 0x60, 0xa5, 0x00, 0xc5, 0x10, 0xd0, 0x0d, 0xa5, 0x01, 0xc5, 0x11, 0xd0, 0x07,
+    0xe6, 0x03, 0xe6, 0x03, 0x20, 0x2a, 0x06, 0x60, 0xa2, 0x02, 0xb5, 0x10, 0xc5, 0x10, 0xd0, 0x06,
+    0xb5, 0x11, 0xc5, 0x11, 0xf0, 0x09, 0xe8, 0xe8, 0xe4, 0x03, 0xf0, 0x06, 0x4c, 0xaa, 0x06, 0x4c,
+    0x35, 0x07, 0x60, 0xa6, 0x03, 0xca, 0x8a, 0xb5, 0x10, 0x95, 0x12, 0xca, 0x10, 0xf9, 0xa5, 0x02,
+    0x4a, 0xb0, 0x09, 0x4a, 0xb0, 0x19, 0x4a, 0xb0, 0x1f, 0x4a, 0xb0, 0x2f, 0xa5, 0x10, 0x38, 0xe9,
+    0x20, 0x85, 0x10, 0x90, 0x01, 0x60, 0xc6, 0x11, 0xa9, 0x01, 0xc5, 0x11, 0xf0, 0x28, 0x60, 0xe6,
+    0x10, 0xa9, 0x1f, 0x24, 0x10, 0xf0, 0x1f, 0x60, 0xa5, 0x10, 0x18, 0x69, 0x20, 0x85, 0x10, 0xb0,
+    0x01, 0x60, 0xe6, 0x11, 0xa9, 0x06, 0xc5, 0x11, 0xf0, 0x0c, 0x60, 0xc6, 0x10, 0xa5, 0x10, 0x29,
+    0x1f, 0xc9, 0x1f, 0xf0, 0x01, 0x60, 0x4c, 0x35, 0x07, 0xa0, 0x00, 0xa5, 0xfe, 0x91, 0x00, 0x60,
+    0xa6, 0x03, 0xa9, 0x00, 0x81, 0x10, 0xa2, 0x00, 0xa9, 0x01, 0x81, 0x10, 0x60, 0xa2, 0x00, 0xea,
+    0xea, 0xca, 0xd0, 0xfb, 0x60
+];
+
 pub trait Memory {
     fn mem_read(&self, addr: u16) -> u8;
 
@@ -70,6 +94,31 @@ impl Memory for CPU {
 
     fn mem_write(&mut self, addr: u16, data: u8) {
         self.memory[addr as usize] = data;
+    }
+}
+
+impl CPU {
+
+    pub fn load_snake(&mut self) {
+        self.memory[0x0600..(0x0600 + SNAKE_GAME.len())].copy_from_slice(&SNAKE_GAME[..]);
+        self.mem_write_u16(0xFFFC, 0x0600)
+    }
+
+    pub fn run_snake_with_callback<F>(&mut self, mut call_back: F)
+    where F: FnMut(&mut CPU),
+    {
+        use crate::exec_opcodes;
+        let mut execution: Vec<u8> = vec![];
+        
+        loop {
+            call_back(self);
+            let byte_code = self.mem_read(self.counter);
+            self.counter += 1;
+
+            exec_opcodes!(self, byte_code);
+            execution.push(byte_code);
+            println!("{:#04X?}", execution);
+        }
     }
 }
 
@@ -481,218 +530,13 @@ impl CPU {
     }
 
     pub fn run(&mut self) {
+        use crate::exec_opcodes;
+
         loop {
             let byte_code = self.mem_read(self.counter);
             self.counter += 1;
 
-            execute!(self, byte_code, 
-                {
-                    /* Special */
-                    BRK::NONE_ADDRESSING,
-
-                    NOP::NONE_ADDRESSING,
-
-                    /* Arithmetic */
-                    ADC::IMMEDIATE, 
-                    ADC::ZERO_PAGE, 
-                    ADC::ZERO_PAGE_X, 
-                    ADC::ABSOLUTE, 
-                    ADC::ABSOLUTE_X, 
-                    ADC::ABSOLUTE_Y,
-                    
-                    AND::IMMEDIATE, 
-                    AND::ZERO_PAGE, 
-                    AND::ZERO_PAGE_X, 
-                    AND::ABSOLUTE, 
-                    AND::ABSOLUTE_X, 
-                    AND::ABSOLUTE_Y,
-                    AND::INDIRECT_X, 
-                    AND::INDIRECT_Y,
-
-                    EOR::IMMEDIATE, 
-                    EOR::ZERO_PAGE, 
-                    EOR::ZERO_PAGE_X, 
-                    EOR::ABSOLUTE, 
-                    EOR::ABSOLUTE_X, 
-                    EOR::ABSOLUTE_Y,
-                    EOR::INDIRECT_X, 
-                    EOR::INDIRECT_Y,
-
-                    ORA::IMMEDIATE, 
-                    ORA::ZERO_PAGE, 
-                    ORA::ZERO_PAGE_X, 
-                    ORA::ABSOLUTE, 
-                    ORA::ABSOLUTE_X, 
-                    ORA::ABSOLUTE_Y,
-                    ORA::INDIRECT_X, 
-                    ORA::INDIRECT_Y,
-
-                    DEC::ZERO_PAGE, 
-                    DEC::ZERO_PAGE_X, 
-                    DEC::ABSOLUTE, 
-                    DEC::ABSOLUTE_X, 
-
-                    /* Shifts */
-                    ASL::NONE_ADDRESSING, // Accumulator
-                    ASL::ZERO_PAGE, 
-                    ASL::ZERO_PAGE_X, 
-                    ASL::ABSOLUTE, 
-                    ASL::ABSOLUTE_X, 
-
-                    ROL::NONE_ADDRESSING, // Accumulator
-                    ROL::ZERO_PAGE, 
-                    ROL::ZERO_PAGE_X, 
-                    ROL::ABSOLUTE, 
-                    ROL::ABSOLUTE_X, 
-
-                    ROR::NONE_ADDRESSING, // Accumulator
-                    ROR::ZERO_PAGE, 
-                    ROR::ZERO_PAGE_X, 
-                    ROR::ABSOLUTE, 
-                    ROR::ABSOLUTE_X, 
-
-                    DEM::ZERO_PAGE, 
-                    DEM::ZERO_PAGE_X, 
-                    DEM::ABSOLUTE, 
-                    DEM::ABSOLUTE_X, 
-
-                    DEX::NONE_ADDRESSING,
-                    
-                    DEY::NONE_ADDRESSING,
-
-                    CMP::IMMEDIATE, 
-                    CMP::ZERO_PAGE, 
-                    CMP::ZERO_PAGE_X, 
-                    CMP::ABSOLUTE, 
-                    CMP::ABSOLUTE_X, 
-                    CMP::ABSOLUTE_Y,
-                    CMP::INDIRECT_X, 
-                    CMP::INDIRECT_Y,
-
-                    CPX::IMMEDIATE, 
-                    CPX::ZERO_PAGE, 
-                    CPX::ABSOLUTE, 
-                    
-                    CPY::IMMEDIATE,
-                    CPY::ZERO_PAGE,
-                    CPY::ABSOLUTE,
-
-                    LSR::NONE_ADDRESSING, // Accumulator 
-                    LSR::ZERO_PAGE, 
-                    LSR::ZERO_PAGE_X, 
-                    LSR::ABSOLUTE, 
-                    LSR::ABSOLUTE_X, 
-
-                    /* Branching */
-                    JMP::ABSOLUTE,
-                    JMP::NONE_ADDRESSING,
-
-                    RTS::NONE_ADDRESSING,
-
-                    RTI::NONE_ADDRESSING,
-
-                    JSR::ABSOLUTE,
-
-                    BCC::NONE_ADDRESSING,
-
-                    BCS::NONE_ADDRESSING,
-
-                    BEQ::NONE_ADDRESSING,
-
-                    BMI::NONE_ADDRESSING,
-
-                    BNE::NONE_ADDRESSING,
-
-                    BPL::NONE_ADDRESSING,
-
-                    BVC::NONE_ADDRESSING,
-
-                    BVS::NONE_ADDRESSING,
-
-                    BIT::ZERO_PAGE,
-                    BIT::ABSOLUTE,
-
-                    /* Stores & Loads */
-                    LDA::IMMEDIATE,
-                    LDA::ZERO_PAGE,
-                    LDA::ZERO_PAGE_X,
-                    LDA::ABSOLUTE,
-                    LDA::ABSOLUTE_X,
-                    LDA::ABSOLUTE_Y,
-                    LDA::INDIRECT_X,
-                    LDA::INDIRECT_Y,
-
-                    LDX::IMMEDIATE,
-                    LDX::ZERO_PAGE,
-                    LDX::ZERO_PAGE_Y,
-                    LDX::ABSOLUTE,
-                    LDX::ABSOLUTE_Y,
-
-                    LDY::IMMEDIATE,
-                    LDY::ZERO_PAGE,
-                    LDY::ZERO_PAGE_X,
-                    LDY::ABSOLUTE,
-                    LDY::ABSOLUTE_X,
-
-                    STA::ZERO_PAGE,
-                    STA::ZERO_PAGE_X,
-                    STA::ABSOLUTE,
-                    STA::ABSOLUTE_X,
-                    STA::ABSOLUTE_Y,
-                    STA::INDIRECT_X,
-                    STA::INDIRECT_Y,
-
-                    STX::ZERO_PAGE,
-                    STX::ZERO_PAGE_X,
-                    STX::ABSOLUTE,
-
-                    STY::ZERO_PAGE,
-                    STY::ZERO_PAGE_X,
-                    STY::ABSOLUTE,
-
-                    /* Flags Clear */
-                    CLD::NONE_ADDRESSING,
-
-                    CLI::NONE_ADDRESSING,
-
-                    CLV::NONE_ADDRESSING,
-
-                    CLC::NONE_ADDRESSING,
-
-                    TAX::NONE_ADDRESSING,
-
-                    TAY::NONE_ADDRESSING,
-
-                    INX::NONE_ADDRESSING,
-
-                    INY::NONE_ADDRESSING,
-
-                    SEC::NONE_ADDRESSING,
-
-                    SEI::NONE_ADDRESSING,
-
-                    SED::NONE_ADDRESSING,
-
-                    TSX::NONE_ADDRESSING,
-
-                    TXA::NONE_ADDRESSING,
-
-                    TXS::NONE_ADDRESSING,
-
-                    TYA::NONE_ADDRESSING,
-
-                    /* Stack */
-                    PHA::NONE_ADDRESSING,
-
-                    PHP::NONE_ADDRESSING,
-
-                    PLA::NONE_ADDRESSING,
-
-                    PLP::NONE_ADDRESSING,
-                }
-            );
-
-            //self.execute(opscode.unwrap())
+            exec_opcodes!(self, byte_code);
         }
     }
 
@@ -739,4 +583,236 @@ pub enum Register {
     A,
     X,
     Y       
+}
+
+// Temporarily moved this setup to a macro in order
+// to throw this into the snake impl for CPU without
+// having to paste the entire thing in...
+#[macro_export]
+#[allow(unused)]
+macro_rules! exec_opcodes {
+    ($cpu:tt, $byte_code:tt) => {
+        execute!(
+            $cpu, 
+            $byte_code, 
+            {
+                /* Special */
+                BRK::NONE_ADDRESSING,
+
+                NOP::NONE_ADDRESSING,
+
+                /* Arithmetic */
+                ADC::IMMEDIATE, 
+                ADC::ZERO_PAGE, 
+                ADC::ZERO_PAGE_X, 
+                ADC::ABSOLUTE, 
+                ADC::ABSOLUTE_X, 
+                ADC::ABSOLUTE_Y,
+
+                SBC::IMMEDIATE,
+                SBC::ZERO_PAGE,
+                SBC::ZERO_PAGE_X,
+                SBC::ABSOLUTE,
+                SBC::ABSOLUTE_X,
+                SBC::ABSOLUTE_Y,
+                SBC::INDIRECT_X,
+                SBC::INDIRECT_Y,
+                
+                AND::IMMEDIATE, 
+                AND::ZERO_PAGE, 
+                AND::ZERO_PAGE_X, 
+                AND::ABSOLUTE, 
+                AND::ABSOLUTE_X, 
+                AND::ABSOLUTE_Y,
+                AND::INDIRECT_X, 
+                AND::INDIRECT_Y,
+
+                EOR::IMMEDIATE, 
+                EOR::ZERO_PAGE, 
+                EOR::ZERO_PAGE_X, 
+                EOR::ABSOLUTE, 
+                EOR::ABSOLUTE_X, 
+                EOR::ABSOLUTE_Y,
+                EOR::INDIRECT_X, 
+                EOR::INDIRECT_Y,
+
+                ORA::IMMEDIATE, 
+                ORA::ZERO_PAGE, 
+                ORA::ZERO_PAGE_X, 
+                ORA::ABSOLUTE, 
+                ORA::ABSOLUTE_X, 
+                ORA::ABSOLUTE_Y,
+                ORA::INDIRECT_X, 
+                ORA::INDIRECT_Y,
+
+                DEC::ZERO_PAGE, 
+                DEC::ZERO_PAGE_X, 
+                DEC::ABSOLUTE, 
+                DEC::ABSOLUTE_X, 
+
+                /* Shifts */
+                ASL::NONE_ADDRESSING, // Accumulator
+                ASL::ZERO_PAGE, 
+                ASL::ZERO_PAGE_X, 
+                ASL::ABSOLUTE, 
+                ASL::ABSOLUTE_X, 
+
+                ROL::NONE_ADDRESSING, // Accumulator
+                ROL::ZERO_PAGE, 
+                ROL::ZERO_PAGE_X, 
+                ROL::ABSOLUTE, 
+                ROL::ABSOLUTE_X, 
+
+                ROR::NONE_ADDRESSING, // Accumulator
+                ROR::ZERO_PAGE, 
+                ROR::ZERO_PAGE_X, 
+                ROR::ABSOLUTE, 
+                ROR::ABSOLUTE_X, 
+
+                INC::ZERO_PAGE,
+                INC::ZERO_PAGE_X,
+                INC::ABSOLUTE,
+                INC::ABSOLUTE_X,
+
+                DEM::ZERO_PAGE, 
+                DEM::ZERO_PAGE_X, 
+                DEM::ABSOLUTE, 
+                DEM::ABSOLUTE_X, 
+
+                DEX::NONE_ADDRESSING,
+                
+                DEY::NONE_ADDRESSING,
+
+                CMP::IMMEDIATE, 
+                CMP::ZERO_PAGE, 
+                CMP::ZERO_PAGE_X, 
+                CMP::ABSOLUTE, 
+                CMP::ABSOLUTE_X, 
+                CMP::ABSOLUTE_Y,
+                CMP::INDIRECT_X, 
+                CMP::INDIRECT_Y,
+
+                CPX::IMMEDIATE, 
+                CPX::ZERO_PAGE, 
+                CPX::ABSOLUTE, 
+                
+                CPY::IMMEDIATE,
+                CPY::ZERO_PAGE,
+                CPY::ABSOLUTE,
+
+                LSR::NONE_ADDRESSING, // Accumulator 
+                LSR::ZERO_PAGE, 
+                LSR::ZERO_PAGE_X, 
+                LSR::ABSOLUTE, 
+                LSR::ABSOLUTE_X, 
+
+                /* Branching */
+                JMP::ABSOLUTE,
+                JMP::NONE_ADDRESSING,
+
+                RTS::NONE_ADDRESSING,
+
+                RTI::NONE_ADDRESSING,
+
+                JSR::ABSOLUTE,
+
+                BCC::NONE_ADDRESSING,
+
+                BCS::NONE_ADDRESSING,
+
+                BEQ::NONE_ADDRESSING,
+
+                BMI::NONE_ADDRESSING,
+
+                BNE::NONE_ADDRESSING,
+
+                BPL::NONE_ADDRESSING,
+
+                BVC::NONE_ADDRESSING,
+
+                BVS::NONE_ADDRESSING,
+
+                BIT::ZERO_PAGE,
+                BIT::ABSOLUTE,
+
+                /* Stores & Loads */
+                LDA::IMMEDIATE,
+                LDA::ZERO_PAGE,
+                LDA::ZERO_PAGE_X,
+                LDA::ABSOLUTE,
+                LDA::ABSOLUTE_X,
+                LDA::ABSOLUTE_Y,
+                LDA::INDIRECT_X,
+                LDA::INDIRECT_Y,
+
+                LDX::IMMEDIATE,
+                LDX::ZERO_PAGE,
+                LDX::ZERO_PAGE_Y,
+                LDX::ABSOLUTE,
+                LDX::ABSOLUTE_Y,
+
+                LDY::IMMEDIATE,
+                LDY::ZERO_PAGE,
+                LDY::ZERO_PAGE_X,
+                LDY::ABSOLUTE,
+                LDY::ABSOLUTE_X,
+
+                STA::ZERO_PAGE,
+                STA::ZERO_PAGE_X,
+                STA::ABSOLUTE,
+                STA::ABSOLUTE_X,
+                STA::ABSOLUTE_Y,
+                STA::INDIRECT_X,
+                STA::INDIRECT_Y,
+
+                STX::ZERO_PAGE,
+                STX::ZERO_PAGE_X,
+                STX::ABSOLUTE,
+
+                STY::ZERO_PAGE,
+                STY::ZERO_PAGE_X,
+                STY::ABSOLUTE,
+
+                /* Flags Clear */
+                CLD::NONE_ADDRESSING,
+
+                CLI::NONE_ADDRESSING,
+
+                CLV::NONE_ADDRESSING,
+
+                CLC::NONE_ADDRESSING,
+
+                TAX::NONE_ADDRESSING,
+
+                TAY::NONE_ADDRESSING,
+
+                INX::NONE_ADDRESSING,
+
+                INY::NONE_ADDRESSING,
+
+                SEC::NONE_ADDRESSING,
+
+                SEI::NONE_ADDRESSING,
+
+                SED::NONE_ADDRESSING,
+
+                TSX::NONE_ADDRESSING,
+
+                TXA::NONE_ADDRESSING,
+
+                TXS::NONE_ADDRESSING,
+
+                TYA::NONE_ADDRESSING,
+
+                /* Stack */
+                PHA::NONE_ADDRESSING,
+
+                PHP::NONE_ADDRESSING,
+
+                PLA::NONE_ADDRESSING,
+
+                PLP::NONE_ADDRESSING,
+            }
+        );
+    }
 }
