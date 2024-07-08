@@ -210,11 +210,11 @@ opcode![
         cpu.update_flag(Flag::Negative, data)
 
     }, [
-        (0x0A, 1, 2, NONE_ADDRESSING), // Accumulator
-        (0x06, 2, 5, ZERO_PAGE),
-        (0x16, 2, 6, ZERO_PAGE_X),
-        (0x0E, 3, 6, ABSOLUTE),
-        (0x1E, 3, 7, ABSOLUTE_X),
+        (0x2A, 1, 2, NONE_ADDRESSING), // Accumulator
+        (0x26, 2, 5, ZERO_PAGE),
+        (0x36, 2, 6, ZERO_PAGE_X),
+        (0x2E, 3, 6, ABSOLUTE),
+        (0x3E, 3, 7, ABSOLUTE_X),
     ],
     
     // Rotate Left
