@@ -87,6 +87,26 @@ opcode![
         (0x71, 2, 5, INDIRECT_Y),
     ],
 
+    // Subtract with Carry
+    // A,Z,C,N = A-M-(1-C)
+    SBC |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        use crate::cpu::{CPU, Memory};
+
+        let addr = cpu.get_operand_addr(mode);
+        let data = cpu.mem_read(addr) as i8;
+
+        cpu.register_a_add(data.wrapping_neg().wrapping_sub(1) as u8);
+    }, [
+        (0xE9, 2, 2, IMMEDIATE),
+        (0xE5, 2, 3, ZERO_PAGE),
+        (0xF5, 2, 4, ZERO_PAGE_X),
+        (0xED, 3, 4, ABSOLUTE),
+        (0xFD, 3, 4, ABSOLUTE_X), // +1 if page crossed
+        (0xF9, 3, 4, ABSOLUTE_Y), // +1 if page crossed
+        (0xE1, 2, 6, INDIRECT_X),
+        (0xF1, 2, 5, INDIRECT_Y), // +1 if page crossed
+    ],
+
     // Logical And
     // A,Z,N = A & M
     AND |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
@@ -618,6 +638,30 @@ opcode![
         cpu.update_flag(crate::cpu::Flag::Negative, cpu.register_y);
     }, [
         (0xA8, 1, 2, NONE_ADDRESSING),
+    ],
+
+    // Increment Memory
+    // M,Z,N = M+1
+    // Adds one to the value held at a specified memory location setting the 
+    // zero and negative flags as appropriate.
+    INC |cpu: &mut crate::cpu::CPU, mode: super::AddressingMode| {
+        
+        use crate::cpu::{Memory};
+
+        let addr = cpu.get_operand_addr(mode);
+        let mut data = cpu.mem_read(addr);
+        data = data.wrapping_add(1);
+
+        cpu.mem_write(addr, data);
+
+        cpu.update_flag(crate::cpu::Flag::Zero, data);
+        cpu.update_flag(crate::cpu::Flag::Negative, data);
+
+    }, [
+        (0xE6, 2, 5, ZERO_PAGE),
+        (0xF6, 2, 6, ZERO_PAGE_X),
+        (0xEE, 3, 6, ABSOLUTE),
+        (0xFE, 3, 7, ABSOLUTE_X),
     ],
 
     // https://www.nesdev.org/obelisk-6502-guide/reference.html#INX
