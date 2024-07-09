@@ -18,7 +18,9 @@ macro_rules! opcode {
                     pub fn execute(cpu: &mut crate::cpu::CPU) {
                         super::execute(cpu, crate::opcodes::AddressingMode::$mode);
                         
-                        cpu.counter += (super::$mode::LEN - 1) as u16;
+                        if (cpu.counter_state == cpu.counter) {
+                            cpu.counter += (super::$mode::LEN - 1) as u16;
+                        }
                     }
                 }                    
             )*

@@ -10,6 +10,7 @@ pub struct CPU {
     pub register_y: u8,
     pub status: Flag,
     pub counter: u16,
+    pub counter_state: u16,
     // The length of the stack STACK_START + stack_pointer to get end of stack
     pub stack_pointer: u8,
     // [0x80000 .. 0xFFFF] Program ROM
@@ -40,7 +41,14 @@ macro_rules! execute {
                     $opcode::$mode::execute($cpu);
                 }
             )*
-            _ => { panic!("No opcode for {:#04X?}", $byte_code) }
+            _ => { 
+                use std::fs::File;
+                use std::io::prelude::*;
+                let mut file = File::create("memory.txt").unwrap();
+                let mem_dump = format!("{:#04X?}", &$cpu.memory);
+                file.write(mem_dump.as_bytes()).unwrap();
+                panic!("No opcode for {:#04X?}", $byte_code) 
+            }
         }
     }
 }
@@ -49,7 +57,6 @@ const SNAKE_GAME: [u8; 16 * 19 + 5] = [
     0x20, 0x06, 0x06, 0x20, 0x38, 0x06, 0x20, 0x0d, 0x06, 0x20, 0x2a, 0x06, 0x60, 0xa9, 0x02, 0x85,
     0x02, 0xa9, 0x04, 0x85, 0x03, 0xa9, 0x11, 0x85, 0x10, 0xa9, 0x10, 0x85, 0x12, 0xa9, 0x0f, 0x85,
     0x14, 0xa9, 0x04, 0x85, 0x11, 0x85, 0x13, 0x85, 0x15, 0x60, 0xa5, 0xfe, 0x85, 0x00, 0xa5, 0xfe,
-    // Fails here on 0xC3 (Invalid opcode!) [ .. 0x85, 0x85, 0x85, 0x60, 0x20, 0x06, 0x8D] 
     0x29, 0x03, 0x18, 0x69, 0x02, 0x85, 0x01, 0x60, 0x20, 0x4d, 0x06, 0x20, 0x8d, 0x06, 0x20, 0xc3, 
     0x06, 0x20, 0x19, 0x07, 0x20, 0x20, 0x07, 0x20, 0x2d, 0x07, 0x4c, 0x38, 0x06, 0xa5, 0xff, 0xc9,
     0x77, 0xf0, 0x0d, 0xc9, 0x64, 0xf0, 0x14, 0xc9, 0x73, 0xf0, 0x1b, 0xc9, 0x61, 0xf0, 0x22, 0x60,
@@ -114,10 +121,14 @@ impl CPU {
             call_back(self);
             let byte_code = self.mem_read(self.counter);
             self.counter += 1;
+            self.counter_state = self.counter;
 
             exec_opcodes!(self, byte_code);
+
             execution.push(byte_code);
-            println!("{:#04X?}", execution);
+            //println!("{:#04X?}", execution);
+
+            call_back(self);
         }
     }
 }
@@ -131,6 +142,7 @@ impl CPU {
             register_y: 0,
             status: Flag::from_bits_truncate(0b100100),
             counter: 0,
+            counter_state: 0,
             stack_pointer: STACK_RESET,
             memory: [0; PGRM_ROM_END as usize]
         }
@@ -199,6 +211,7 @@ impl CPU {
         self.register_y = 0;
         self.status = Flag::from_bits_truncate(0b100100);
         self.counter = self.mem_read_u16(PGRM_START_ADDR);
+        self.counter_state = self.counter;
         self.stack_pointer = STACK_RESET;
     }
 

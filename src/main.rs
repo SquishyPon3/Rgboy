@@ -74,7 +74,7 @@ fn handle_input(cpu: &mut CPU, event_pump: &mut EventPump) {
             Event::KeyDown { keycode: Some(Keycode::D), .. } => {
                 cpu.mem_write(0xFF, 0x64)
             }
-            _ => { return; }
+            _ => {/* Do nothing! */}
         }
     }
 }
@@ -122,10 +122,32 @@ fn read_screen_state(cpu: &CPU, frame: &mut [u8; 32 * 3 * 32]) -> bool {
 mod test {
     use std::ops::BitAnd;
 
+    use opcodes::{ADC, CLC, SBC, SEC};
+
     use crate::{cpu::Flag, opcodes::{INX, BRK, CPY, LDA, TAX}};
 
     use super::*;
- 
+
+// #[test]
+// fn test_lda_zero_page_load_data() {
+//     let mut cpu: CPU = CPU::new();
+//     let program = vec![
+//         CLC::NONE_ADDRESSING::VALUE, 
+//         LDA::IMMEDIATE::VALUE,
+//         0x02,
+//         ADC::IMMEDIATE::VALUE,
+//         0x03,
+//         SEC::NONE_ADDRESSING::VALUE,
+//         LDA::IMMEDIATE::VALUE,
+//         0x15,
+//         SBC::IMMEDIATE::VALUE,
+//         0x08,
+//         BRK::NONE_ADDRESSING::VALUE
+//     ];
+
+//     cpu.load_and_run(program);
+// }
+
 #[test]
 fn test_0xa9_lda_immediate_load_data() {
     let mut cpu: CPU = CPU::new();
