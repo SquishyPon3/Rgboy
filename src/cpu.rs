@@ -33,6 +33,12 @@ macro_rules! execute {
             // Need to check specficially for BRK code
             // since it stops execution.
             0x00 => {
+                // unsafe {
+                //     use std::fs::File;
+                //     use std::io::prelude::*;
+                //     let mut file = File::create("history.txt").unwrap();
+                //     file.write(crate::opcodes::HISTORY.as_bytes()).unwrap();
+                // }                
                 return;
             }
 
@@ -115,7 +121,7 @@ impl CPU {
     where F: FnMut(&mut CPU),
     {
         use crate::exec_opcodes;
-        let mut execution: Vec<u8> = vec![];
+        //let mut execution: Vec<u8> = vec![];
         
         loop {
             call_back(self);
@@ -125,8 +131,7 @@ impl CPU {
 
             exec_opcodes!(self, byte_code);
 
-            execution.push(byte_code);
-            //println!("{:#04X?}", execution);
+            //execution.push(byte_code);            
 
             call_back(self);
         }

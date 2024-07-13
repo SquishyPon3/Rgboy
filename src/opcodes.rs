@@ -1,31 +1,55 @@
+//pub static mut HISTORY: String = String::new();
 
 /// Generates an opcode and its various specific params
 #[macro_export]
 #[allow(unused)]
 macro_rules! opcode {
+    // Assembly name,
+    // behavior expression, 
+    // opcode # value,
+    // memory length, 
+    // # of cpu cycles to execute, 
+    // addressing mode
     ($($name:ident $exec:expr, [$(($value:tt, $length:tt, $cycles:tt, $mode:ident)),*,]),*) => (
+        
+        // Generate a public module for each opcode value
         #[allow(non_camel_case_types, unused, non_snake_case)]
         $(pub mod $name {
-            // pub const modes: [crate::opcodes::AddressingMode; 10] = [
-            //     $(crate::opcodes::AddressingMode::$mode,)*
-            // ];
+
+            // Foreach opcode value create a sub module with the 
+            // value, length, and # of cycles to execute
             $(
                 #[allow(non_camel_case_types, unused, non_snake_case)]
                 pub mod $mode {
                     pub const VALUE: u8 = $value;
                     pub const LEN: u8 = $length;
                     pub const CYCLES: u8 = $cycles;
+
+                    // Generate an execute function pointer with the specified
+                    // addressing mode
                     pub fn execute(cpu: &mut crate::cpu::CPU) {
                         super::execute(cpu, crate::opcodes::AddressingMode::$mode);
                         
                         if (cpu.counter_state == cpu.counter) {
                             cpu.counter += (super::$mode::LEN - 1) as u16;
                         }
+                        
+                        // Writes history of execution
+                        // for debugging purposes...
+                        // unsafe {
+                        //     let mut mode = stringify!($mode);
+                        //     if (mode == "NONE_ADDRESSING") {
+                        //         mode = "";
+                        //     }
+                        //     let cmd = String::from(format!("{} {}\n", stringify!($name), mode));
+                        //     crate::opcodes::HISTORY.push_str(&cmd);
+                        // }                  
                     }
                 }                    
             )*
             
-            // Dynamically build this with a provided expr argument?
+            // Generate an assembly command module level function 
+            // via the provided expression arg
             pub fn execute(
                 cpu: &mut crate::cpu::CPU, 
                 mode: crate::opcodes::AddressingMode) 
