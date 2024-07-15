@@ -220,7 +220,7 @@ impl CPU {
         self.stack_pointer = STACK_RESET;
     }
 
-    pub fn compare(&mut self, mode: AddressingMode, value: u8) {
+    pub fn compare(&mut self, mode: AddressingMode, mut value: u8) {
         let addr = self.get_operand_addr(mode);
         let data = self.mem_read(addr);
 
@@ -229,13 +229,11 @@ impl CPU {
         } else {
             self.status.remove(Flag::Carry);  
         }
+
+        value = value.wrapping_sub(data);
         
-        self.update_flag(
-            Flag::Zero, 
-            value.wrapping_sub(data));
-        self.update_flag(
-            Flag::Negative,
-            value.wrapping_sub(data));
+        self.update_flag(Flag::Zero,value);
+        self.update_flag(Flag::Negative,value);
     }
     
     pub fn logical_shift_right_a(&mut self) {
