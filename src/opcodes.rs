@@ -253,7 +253,8 @@ opcode![
         };
 
         cpu.update_flag(Flag::Zero, data);
-        cpu.update_flag(Flag::Negative, data)
+        cpu.update_flag(Flag::Negative, data);
+        return data;
 
     }, [
         (0x2A, 1, 2, NONE_ADDRESSING), // Accumulator

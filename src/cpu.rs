@@ -306,11 +306,10 @@ impl CPU {
         data <<= 1;
 
         if had_carry {
-            data = data | 0b1000_0000;
+            data |= 1;
         }
 
         self.mem_write(addr, data);
-        self.update_flag(Flag::Zero, data);
         self.update_flag(Flag::Negative, data);
 
         return data;
@@ -568,7 +567,7 @@ impl CPU {
                 }
             },
             Flag::Negative => {
-                if register >> 1 == 1 {
+                if register >> 7 == 1 {
                     self.status.insert(Flag::Negative);
                 }
                 else {
