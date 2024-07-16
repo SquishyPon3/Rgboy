@@ -124,7 +124,6 @@ impl CPU {
         //let mut execution: Vec<u8> = vec![];
         
         loop {
-            call_back(self);
             let byte_code = self.mem_read(self.counter);
             self.counter += 1;
             self.counter_state = self.counter;

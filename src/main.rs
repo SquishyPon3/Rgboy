@@ -2,11 +2,14 @@ mod cpu;
 mod opcodes;
 mod gamepad;
 
-use core::time;
+use std::{time::{SystemTime}};
 
 use cpu::{Memory, CPU};
 use rand::Rng;
 use sdl2::{event::Event, keyboard::Keycode, pixels::{Color, PixelFormat, PixelFormatEnum}, EventPump};
+use spin_sleep::SpinSleeper;
+
+const FRAME_TIMING: f64 = 1_000_000_000.0 / 60.0;
 
 fn main() {
 
@@ -41,6 +44,9 @@ fn main() {
     let mut screen_state = [0 as u8; 32 * 3 * 32];
     let mut rng = rand::thread_rng();
 
+    let sleeper = SpinSleeper::default();
+    let mut lastTime = SystemTime::now();
+
     cpu.run_snake_with_callback(move |cpu| {
         
         handle_input(cpu, &mut event_pump);
@@ -50,9 +56,16 @@ fn main() {
             texture.update(None, &screen_state, 32 * 3).unwrap();
             canvas.copy(&texture, None, None).unwrap();
             canvas.present();
+            
+            let delta = lastTime.elapsed().unwrap().as_nanos() as u64;
+            
+            if delta < FRAME_TIMING as u64
+            {
+                sleeper.sleep_ns(FRAME_TIMING as u64 - delta);
+            }
+    
+            lastTime = SystemTime::now();
         }
-        
-        std::thread::sleep(time::Duration::new(0, 70_000))
     });
 }
 
